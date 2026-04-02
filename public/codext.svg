@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="12" fill="#0d0d0d"/>
+  <text x="10" y="44" font-family="monospace" font-weight="bold" font-size="26" fill="#e8ff57">[</text>
+  <text x="20" y="44" font-family="monospace" font-weight="bold" font-size="16" fill="#f0f0f0">CX</text>
+  <text x="46" y="44" font-family="monospace" font-weight="bold" font-size="26" fill="#e8ff57">]</text>
+</svg>
