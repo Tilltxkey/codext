@@ -120,3 +120,7 @@ In 2026, the friction of getting a local codebase into an LLM context is real:
 - IDEs don't produce clean, portable context bundles
 
 CODEXT solves this in one drag-and-drop.
+
+
+
+great now, make the website (home: the product to talk about codext great utility, differnt usecase (developer, data privay in llm ingestion, share easily with other IA, start new easily ect idk (you find), to any others domains idk (you find) real great use case) , advantages ect idk do like those sucessfull website ones tech product (vercel,supabase) pricing : you know what to do) and so now when user click on get pro -12 it can atually purchase.

@@ -3,3 +3,6 @@ src-tauri/target/
 .vscode/
 .idea/
 dist/
+package-lock.json
+Cargo.lock
+src-tauri/gen/
