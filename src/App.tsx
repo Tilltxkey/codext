@@ -40,7 +40,7 @@ interface GhRepo {
 
 interface TreeNode {
   name: string;
-  path: string;        // full path from repo root
+  path: string;
   type: "dir" | "file";
   children?: TreeNode[];
   expanded?: boolean;
@@ -48,11 +48,39 @@ interface TreeNode {
 
 type GhState = "disconnected" | "connecting" | "connected" | "fetching";
 
+// ─── Recent folders ───────────────────────────────────────────────────────────
+
+interface RecentFolder {
+  path: string;
+  name: string;
+  lastUsed: number; // unix ms
+}
+
+const RECENT_MAX = 5;
+const RECENT_KEY = "codext_recent_folders";
+
+function loadRecents(): RecentFolder[] {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]"); } catch { return []; }
+}
+
+function saveRecents(list: RecentFolder[]) {
+  localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+}
+
+function pushRecent(path: string, name: string) {
+  const existing = loadRecents().filter(r => r.path !== path);
+  const updated = [{ path, name, lastUsed: Date.now() }, ...existing].slice(0, RECENT_MAX);
+  saveRecents(updated);
+  return updated;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SITE_URL = "https://codext-web.vercel.app";
 const POLL_INTERVAL_MS = 4000;
 const POLL_MAX_ATTEMPTS = 20;
+// Free tier threshold — badge only appears when this many bundles or fewer remain
+const BADGE_WARN_THRESHOLD = 3;
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
@@ -82,6 +110,7 @@ export default function App() {
 
   // ── GitHub state ──
   const [ghState, setGhState] = useState<GhState>("disconnected");
+  const [ghError, setGhError] = useState<string | null>(null);
   const [ghUser, setGhUser] = useState<{ login: string; avatar_url: string } | null>(null);
   const [ghToken, setGhToken] = useState<string | null>(null);
   const [ghRepos, setGhRepos] = useState<GhRepo[]>([]);
@@ -94,6 +123,7 @@ export default function App() {
   // ── Feature flags ──
   const [structureOnly, setStructureOnly] = useState(false);
   const [pickFolders, setPickFolders] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
 
   // ── Folder picker state ──
   const [folderPickerFolders, setFolderPickerFolders] = useState<
@@ -105,6 +135,16 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem("codext_exclusions") ?? "[]"); } catch { return []; }
   });
 
+  // ── Recent folders state ──
+  const [recentFolders, setRecentFolders] = useState<RecentFolder[]>(loadRecents);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const historyRef = useRef<HTMLDivElement>(null);
+
+  // ── Update state ──
+  const [updateAvailable, setUpdateAvailable] = useState<{ current: string; next: string; notes: string[] } | null>(null);
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const updateRef = useRef<HTMLDivElement>(null);
+  const tokenInputRef = useRef<HTMLInputElement>(null);
 
   // ── On mount ──
   useEffect(() => {
@@ -117,20 +157,25 @@ export default function App() {
             .then(r => { if (r.is_pro) refreshLicense(); })
             .catch(() => {});
         }
-        // Restore saved GitHub token
         try {
           const saved = await invoke<string | null>("get_github_token");
-          if (saved) {
-            setGhToken(saved);
-            fetchGhUser(saved);
-          }
+          if (saved) { setGhToken(saved); fetchGhUser(saved); }
         } catch (_) {}
       } catch (e) { console.error("Init error:", e); }
     };
     init();
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  // Close history dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (historyRef.current && !historyRef.current.contains(e.target as Node)) {
+        setHistoryOpen(false);
+      }
     };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   // ─── License helpers ──────────────────────────────────────────────────────
@@ -198,7 +243,11 @@ export default function App() {
     setError("");
     try {
       const info = await invoke<FolderInfo>("get_folder_info", { folderPath: path });
-      setFolderInfo(info); setState("loaded");
+      setFolderInfo(info);
+      setState("loaded");
+      // Save to recents
+      const updated = pushRecent(path, info.name);
+      setRecentFolders(updated);
     } catch (e) { setError(String(e)); setState("error"); }
   }, []);
 
@@ -207,6 +256,18 @@ export default function App() {
       const selected = await open({ directory: true, multiple: false, title: "Select your project folder" });
       if (selected && typeof selected === "string") await loadFolder(selected);
     } catch (e) { setError(String(e)); setState("error"); }
+  };
+
+  const handleOpenRecent = async (recent: RecentFolder) => {
+    setHistoryOpen(false);
+    await loadFolder(recent.path);
+  };
+
+  const handleRemoveRecent = (e: React.MouseEvent, path: string) => {
+    e.stopPropagation();
+    const updated = recentFolders.filter(r => r.path !== path);
+    setRecentFolders(updated);
+    saveRecents(updated);
   };
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); };
@@ -261,210 +322,115 @@ export default function App() {
 
   // ─── GitHub helpers ───────────────────────────────────────────────────────
 
+  const handlePasteToken = async (token: string) => {
+    if (!token) return;
+    setGhError(null);
+    await invoke("store_github_token", { token });
+    setGhToken(token);
+    await fetchGhUser(token);
+    if (tokenInputRef.current) tokenInputRef.current.value = "";
+  };
+
   const fetchGhUser = async (token: string) => {
+    setGhError(null);
     try {
       setGhState("fetching");
       const res = await fetch("https://api.github.com/user", {
         headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" }
       });
-      if (!res.ok) { setGhState("disconnected"); setGhToken(null); return; }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setGhError(`Auth failed (${res.status}): ${body.message ?? "bad token"}`);
+        setGhState("disconnected"); setGhToken(null); return;
+      }
       const user = await res.json();
       setGhUser({ login: user.login, avatar_url: user.avatar_url });
-      await fetchGhRepos(token);
+      const reposRes = await fetch("https://api.github.com/user/repos?sort=updated&per_page=50", {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" }
+      });
+      if (!reposRes.ok) {
+        const body = await reposRes.json().catch(() => ({}));
+        setGhError(`Repos failed (${reposRes.status}): ${body.message ?? "unknown"}`);
+        setGhState("disconnected"); setGhToken(null); return;
+      }
+      const repos = await reposRes.json();
+      setGhRepos(Array.isArray(repos) ? repos : []);
       setGhState("connected");
-    } catch (_) { setGhState("disconnected"); }
-  };
-
-  const fetchGhRepos = async (token: string) => {
-    const res = await fetch("https://api.github.com/user/repos?sort=updated&per_page=30&affiliation=owner,collaborator", {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" }
-    });
-    if (!res.ok) return;
-    const repos: GhRepo[] = await res.json();
-    setGhRepos(repos);
+    } catch (e) {
+      setGhError(`Network error: ${String(e)}`);
+      setGhState("disconnected");
+    }
   };
 
   const handleConnectGitHub = async () => {
     setGhState("connecting");
-    try {
-      await openUrl(`${SITE_URL}/auth/github`);
-
-      let settled = false;
-
-      const settle = async (token: string) => {
-        if (settled) return;
-        settled = true;
-        if (pollId) clearInterval(pollId);
-        setGhToken(token);
-        await invoke("store_github_token", { token });
-        fetchGhUser(token);
-      };
-
-      // Path A — Tauri deep-link event (works in production after install)
-      const unlisten = await listen<string>("github-token-received", async (event) => {
-        unlisten();
-        await settle(event.payload);
-      });
-
-      // Path B — poll the file on disk (works in dev / cargo run)
-      // Rust writes the token via store_github_token when the deep link fires,
-      // OR the user can paste it manually via the web page copy button.
-      let pollId: ReturnType<typeof setInterval>;
-      pollId = setInterval(async () => {
-        try {
-          const token = await invoke<string | null>("get_github_token");
-          if (token) { unlisten(); await settle(token); }
-        } catch (_) {}
-      }, 2000);
-
-      // Give up after 5 minutes
-      setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          clearInterval(pollId);
-          unlisten();
-          setGhState("disconnected");
-        }
-      }, 300_000);
-
-    } catch (_) { setGhState("disconnected"); }
+    try { await openUrl(`${SITE_URL}/auth/github`); } catch { setGhState("disconnected"); }
   };
 
   const handleSyncRepos = async () => {
     if (!ghToken) return;
     setGhState("fetching");
-    await fetchGhRepos(ghToken);
-    setGhState("connected");
+    await fetchGhUser(ghToken);
   };
 
   const handleDisconnect = async () => {
-    try { await invoke("store_github_token", { token: null }); } catch (_) {}
-    setGhToken(null); setGhUser(null); setGhRepos([]);
+    try { await invoke("store_github_token", { token: null }); } catch {}
+    setGhState("disconnected"); setGhToken(null); setGhUser(null); setGhRepos([]);
     setExpandedRepo(null); setRepoTrees({}); setSelectedDir(null);
-    setGhState("disconnected");
   };
 
   const handleToggleRepo = async (repo: GhRepo) => {
-    const key = repo.full_name;
-    // Always select the repo root when clicking the repo row
-    setSelectedDir(`${key}::__root__`);
-    if (expandedRepo === key) { setExpandedRepo(null); return; }
-    setExpandedRepo(key);
-    if (repoTrees[key]) return;
-    if (!ghToken) return;
+    if (expandedRepo === repo.full_name) { setExpandedRepo(null); return; }
+    setExpandedRepo(repo.full_name);
+    if (repoTrees[repo.full_name]) return;
     try {
-      const res = await fetch(
-        `https://api.github.com/repos/${key}/contents/`,
-        { headers: { Authorization: `Bearer ${ghToken}`, Accept: "application/vnd.github+json" } }
-      );
-      if (!res.ok) return;
-      const items = await res.json();
-      const nodes: TreeNode[] = (items as any[])
-        .map((i: any) => ({ name: i.name, path: i.path, type: i.type === "dir" ? "dir" : "file" }))
-        .sort((a: TreeNode, b: TreeNode) => {
-          if (a.type === b.type) return a.name.localeCompare(b.name);
-          return a.type === "dir" ? -1 : 1;
-        });
-      setRepoTrees(prev => ({ ...prev, [key]: nodes }));
-    } catch (_) {}
+      const tree = await fetch(`https://api.github.com/repos/${repo.full_name}/git/trees/HEAD?recursive=1`, {
+        headers: { Authorization: `Bearer ${ghToken}`, Accept: "application/vnd.github+json" }
+      }).then(r => r.json());
+      const nodes = buildTree(tree.tree ?? []);
+      setRepoTrees(prev => ({ ...prev, [repo.full_name]: nodes }));
+    } catch {}
   };
 
-  const handleToggleDir = async (repoKey: string, node: TreeNode) => {
-    const dirKey = `${repoKey}::${node.path}`;
-    const newExpanded = new Set(expandedDirs);
-    if (newExpanded.has(dirKey)) { newExpanded.delete(dirKey); setExpandedDirs(newExpanded); return; }
-    newExpanded.add(dirKey);
-    setExpandedDirs(newExpanded);
-
-    // Fetch children if not loaded
-    const parentTree = repoTrees[repoKey];
-    if (!parentTree || !ghToken) return;
-    const existing = findNode(parentTree, node.path);
-    if (existing?.children) return; // already fetched
-
-    try {
-      const res = await fetch(
-        `https://api.github.com/repos/${repoKey}/contents/${node.path}`,
-        { headers: { Authorization: `Bearer ${ghToken}`, Accept: "application/vnd.github+json" } }
-      );
-      if (!res.ok) return;
-      const items = await res.json();
-      const children: TreeNode[] = (items as any[])
-        .map((i: any) => ({ name: i.name, path: i.path, type: i.type === "dir" ? "dir" : "file" }))
-        .sort((a: TreeNode, b: TreeNode) => {
-          if (a.type === b.type) return a.name.localeCompare(b.name);
-          return a.type === "dir" ? -1 : 1;
-        });
-      setRepoTrees(prev => ({
-        ...prev,
-        [repoKey]: insertChildren(prev[repoKey], node.path, children)
-      }));
-    } catch (_) {}
+  const handleToggleDir = (repoKey: string, node: TreeNode) => {
+    const key = `${repoKey}::${node.path}`;
+    setExpandedDirs(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
   };
-
-  const findNode = (nodes: TreeNode[], path: string): TreeNode | null => {
-    for (const n of nodes) {
-      if (n.path === path) return n;
-      if (n.children) { const found = findNode(n.children, path); if (found) return found; }
-    }
-    return null;
-  };
-
-  const insertChildren = (nodes: TreeNode[], path: string, children: TreeNode[]): TreeNode[] =>
-    nodes.map(n => n.path === path
-      ? { ...n, children }
-      : n.children ? { ...n, children: insertChildren(n.children, path, children) } : n
-    );
 
   const handleSelectDir = (repoKey: string, node: TreeNode) => {
-    setSelectedDir(`${repoKey}::${node.path}`);
+    const key = `${repoKey}::${node.path}`;
+    setSelectedDir(prev => prev === key ? null : key);
+  };
+
+  const handleSelectRepoRoot = (repo: GhRepo) => {
+    const key = `${repo.full_name}::__root__`;
+    setSelectedDir(prev => prev === key ? null : key);
   };
 
   const handleCloneAndLoad = async () => {
     if (!selectedDir || !ghToken) return;
-    const colonIdx = selectedDir.indexOf("::");
-    const repoKey = selectedDir.slice(0, colonIdx);
-    const dirPath = selectedDir.slice(colonIdx + 2);
+    const repoKey = selectedDir.slice(0, selectedDir.indexOf("::"));
+    const dirPath = selectedDir.slice(selectedDir.indexOf("::") + 2);
     const repo = ghRepos.find(r => r.full_name === repoKey);
     if (!repo) return;
-    setCloning(repoKey);
+    setCloning(selectedDir);
     try {
-      const localPath = await invoke<string>("github_clone_repo", {
+      const clonedPath = await invoke<string>("github_clone_repo", {
         cloneUrl: repo.clone_url,
-        token: ghToken,
+        token: ghToken ?? "",
         subPath: dirPath === "__root__" ? "" : dirPath,
       });
-      setCloning(null);
-      await loadFolder(localPath);
-    } catch (e) {
-      setCloning(null);
-      setError(`Clone failed: ${String(e)}`);
-      setState("error");
-    }
+      await loadFolder(clonedPath);
+    } catch (e) { setError(String(e)); setState("error"); }
+    finally { setCloning(null); }
   };
 
-  // ── Folder picker helpers ─────────────────────────────────────────────────
+  // ─── Folder picker helpers ────────────────────────────────────────────────
 
   const DEFAULT_IGNORED = new Set([
-    "node_modules",".git","dist","build",".next","target","__pycache__",
-    ".cache","coverage",".nyc_output","vendor",".venv","venv","env",".env",
-    ".idea",".vscode","out",".turbo",".parcel-cache","storybook-static",
-    ".svelte-kit","elm-stuff",".dart_tool"
+    "node_modules",".git","dist","build",".next","out","coverage",
+    ".turbo",".cache","__pycache__",".pytest_cache","target","vendor",
   ]);
-
-  interface PickerFolder {
-    path: string; name: string; depth: number;
-    included: boolean; expanded: boolean; children: PickerFolder[];
-    autoExcluded: boolean; // greyed out — already skipped by options
-  }
-
-  const buildPickerTree = (basePath: string): PickerFolder[] => {
-    // We'll scan the local filesystem via the folderInfo path
-    // Since we only have JS, we pass folder scanning to Rust via a new invoke,
-    // but for now build from the path list we get after loadFolder.
-    // The actual scan is done when the user hits "Bundle" — we list subdirs.
-    return [];
-  };
 
   const openFolderPicker = async () => {
     if (!folderInfo) return;
@@ -472,53 +438,45 @@ export default function App() {
       const dirs = await invoke<{ path: string; name: string; depth: number }[]>(
         "list_top_level_dirs", { folderPath: folderInfo.path }
       );
-      const init = dirs.map(d => ({
+      setFolderPickerFolders(dirs.map(d => ({
         ...d,
         included: !savedExclusions.includes(d.path),
         expanded: false,
         children: [],
-        autoExcluded:
-          (options.skip_default_ignores && DEFAULT_IGNORED.has(d.name)),
-      }));
-      setFolderPickerFolders(init as any);
+        autoExcluded: options.skip_default_ignores && DEFAULT_IGNORED.has(d.name),
+      })));
       setFolderPickerOpen(true);
-    } catch (_) {}
+    } catch (e) { console.error(e); }
   };
 
   const proceedBundle = async () => {
     setFolderPickerOpen(false);
-    const collectExcluded = (nodes: any[]): string[] =>
-      nodes.flatMap((f: any) => [
-        ...(!f.included && !f.autoExcluded ? [f.path] : []),
-        ...(f.children ? collectExcluded(f.children) : []),
-      ]);
-    const excl = collectExcluded(folderPickerFolders as any[]);
-    if (rememberExclusions) {
-      localStorage.setItem("codext_exclusions", JSON.stringify(excl));
-      setSavedExclusions(excl);
-    }
-    await runBundle();
-  };
-
-  const runBundle = async () => {
-    if (!folderInfo) return;
-    setState("processing"); setProgress(0);
-    let p = 0;
-    const interval = setInterval(() => {
-      p += Math.random() * 8; if (p > 90) { p = 90; clearInterval(interval); }
-      setProgress(Math.floor(p));
-    }, 120);
-    const extraExclusions = (folderPickerFolders as any[])
+    const excluded = (folderPickerFolders as any[])
       .filter((f: any) => !f.included && !f.autoExcluded)
       .map((f: any) => f.path);
+    if (rememberExclusions) {
+      setSavedExclusions(excluded);
+      localStorage.setItem("codext_exclusions", JSON.stringify(excluded));
+    }
+    await runBundle(excluded);
+  };
+
+  // ─── Bundle runner ────────────────────────────────────────────────────────
+
+  const runBundle = async (excludedFolders: string[] = []) => {
+    if (!folderInfo) return;
+    setState("processing"); setProgress(0);
+    const interval = setInterval(() => setProgress(p => Math.min(p + Math.random() * 8, 90)), 300);
     try {
       const res = await invoke<ProcessResult>("process_folder", {
         folderPath: folderInfo.path,
         options: { ...options, structure_only: structureOnly },
-        extraExclusions,
+        extraExclusions: excludedFolders,
       });
       clearInterval(interval); setProgress(100);
-      setResult(res); setState("done"); setDownloadDismissed(false);
+      setTimeout(() => {
+        setResult(res); setState("done"); setDownloadDismissed(false);
+      }, 200);
       await refreshLicense();
     } catch (e) {
       clearInterval(interval); setProgress(0);
@@ -535,12 +493,30 @@ export default function App() {
 
   const isPro = license?.is_pro ?? false;
   const bundlesLeft = license ? Math.max(0, license.free_bundle_limit - license.bundle_count) : 0;
+  // Badge is only shown when ≤ BADGE_WARN_THRESHOLD bundles remain (or on process attempt)
+  const showFreeBadge = !isPro && license !== null && bundlesLeft <= BADGE_WARN_THRESHOLD;
   const filename = result?.output_path.split(/[\\/]/).pop() ?? "";
   const selRepoKey = selectedDir ? selectedDir.slice(0, selectedDir.indexOf("::")) : null;
   const selPath = selectedDir ? selectedDir.slice(selectedDir.indexOf("::") + 2) : null;
   const selDisplayName = selPath === "__root__"
     ? selRepoKey?.split("/")[1] ?? ""
     : selPath ?? "";
+
+  // Relative time label for recents
+  const relativeTime = (ms: number) => {
+    const diff = Date.now() - ms;
+    if (diff < 60_000) return "just now";
+    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+    return `${Math.floor(diff / 86_400_000)}d ago`;
+  };
+
+  // Smart size formatter — input is always KB from backend
+  const formatSize = (kb: number) => {
+    if (kb < 1024) return `${kb.toFixed(0)} KB`;
+    if (kb < 1024 * 1024) return `${(kb / 1024).toFixed(1)} MB`;
+    return `${(kb / (1024 * 1024)).toFixed(2)} GB`;
+  };
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -560,27 +536,170 @@ export default function App() {
 
       {/* ── Header ── */}
       <header className="header">
-        <div className="header-left">
-          <div className="logo"><span className="logo-bracket">[</span>CODEXT<span className="logo-bracket">]</span></div>
-          <p className="tagline">Context Bundler — flatten any codebase into a single .txt</p>
+
+        {/* ── Left: logo ── */}
+        <div className="header-logo">
+          <svg className="logo-mark" width="26" height="20" viewBox="0 0 377 294" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M13.5 288.3V11.7H65.7V32.4H37.2V267.3H65.7V288.3H13.5Z" fill="#DCFF00"/>
+            <path d="M365.7 288.3H313.5V267.3H342V32.4H313.5V11.7H365.7V288.3Z" fill="#DCFF00"/>
+            <rect x="86.6344" y="120.332" width="25" height="150" rx="4" transform="rotate(-60 86.6344 120.332)" fill="#DCFF00"/>
+            <rect x="99.5" y="195.651" width="25" height="150" rx="4" transform="rotate(-120 99.5 195.651)" fill="#DCFF00"/>
+            <rect x="146" y="72" width="25" height="150" rx="4" fill="#DCFF00"/>
+          </svg>
+          <span className="logo">CODEXT</span>
         </div>
+
+        {/* ── Spacer ── */}
+        <div className="header-spacer" />
+
+        {/* ── Right: icon actions + license badge ── */}
         <div className="header-right">
+
+          {/* Recent folders */}
+          <div className="history-wrap" ref={historyRef}>
+            <button
+              className={`h-icon-btn ${historyOpen ? "h-icon-btn--active" : ""}`}
+              onClick={() => setHistoryOpen(o => !o)}
+              title="Recent folders"
+            >
+              <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
+                <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M7 4v3.2l2 1.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+
+            {historyOpen && (
+              <div className="history-dropdown history-dropdown--right">
+                <div className="history-dropdown-header">
+                  <span>Recent folders</span>
+                  {recentFolders.length > 0 && (
+                    <button className="history-clear-all" onClick={() => {
+                      setRecentFolders([]); saveRecents([]); setHistoryOpen(false);
+                    }}>Clear all</button>
+                  )}
+                </div>
+                {recentFolders.length === 0 ? (
+                  <div className="history-empty">
+                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" style={{opacity:.2,marginBottom:4}}>
+                      <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.3"/>
+                      <path d="M10 6v4.5l2.5 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    No recent folders yet
+                  </div>
+                ) : (
+                  <div className="history-list">
+                    {recentFolders.map(r => (
+                      <button key={r.path} className="history-item" onClick={() => handleOpenRecent(r)}>
+                        <div className="history-item-icon">
+                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                            <path d="M2 4.5A1.5 1.5 0 013.5 3h3l1.5 1.5H12.5A1.5 1.5 0 0114 6v6a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 12V4.5z" stroke="currentColor" strokeWidth="1.2"/>
+                          </svg>
+                        </div>
+                        <div className="history-item-info">
+                          <span className="history-item-name">{r.name}</span>
+                          <span className="history-item-path">{r.path}</span>
+                        </div>
+                        <span className="history-item-time">{relativeTime(r.lastUsed)}</span>
+                        <span
+                          className="history-item-remove"
+                          role="button"
+                          onClick={(e) => handleRemoveRecent(e, r.path)}
+                          title="Remove"
+                        >
+                          <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                            <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                          </svg>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Browse folder */}
+          <button className="h-icon-btn" onClick={handleBrowse} title="Browse folder">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M2 4.5A1.5 1.5 0 013.5 3h3l1.5 1.5H12.5A1.5 1.5 0 0114 6v6a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 12V4.5z" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M8 8v4M8 8L6 10M8 8l2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+
+          <div className="h-divider" />
+
+          {/* Update button — only when available */}
+          {updateAvailable && (
+            <div className="h-update-wrap" ref={updateRef}>
+              <button
+                className={`h-icon-btn h-icon-btn--update ${updateOpen ? "h-icon-btn--active" : ""}`}
+                onClick={() => setUpdateOpen(o => !o)}
+                title={`v${updateAvailable.next} available`}
+              >
+                <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
+                  <path d="M12 7A5 5 0 112.5 4.5M2 2v3h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span className="h-update-dot" />
+              </button>
+
+              {updateOpen && (
+                <div className="update-dropdown">
+                  <div className="upd-header">
+                    <span className="upd-title">Update available</span>
+                    <span className="upd-new-badge">NEW</span>
+                  </div>
+                  <div className="upd-body">
+                    <div className="upd-version-row">
+                      <span className="upd-v-current">{updateAvailable.current}</span>
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none" style={{color:"var(--text-3)"}}>
+                        <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span className="upd-v-next">{updateAvailable.next}</span>
+                    </div>
+                    {updateAvailable.notes.length > 0 && (
+                      <ul className="upd-notes">
+                        {updateAvailable.notes.map((note, i) => (
+                          <li key={i} className="upd-note-item">
+                            <span className="upd-note-dot">·</span>
+                            <span>{note}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <button className="upd-download-btn" onClick={() => openUrl(`${SITE_URL}/downloads/latest`)}>
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                        <path d="M7 1v9M7 10l-4-4M7 10l4-4M2 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Download {updateAvailable.next}
+                    </button>
+                    <button className="upd-skip-btn" onClick={() => setUpdateOpen(false)}>
+                      Skip this version
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* License badge — Pro always, free only when ≤3 left */}
           {isPro ? (
             <button className="badge-pro" onClick={() => { setLicenseMsg(null); setModal("license"); }}>
-              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+              <svg width="10" height="10" viewBox="0 0 11 11" fill="none">
                 <path d="M5.5 1L6.8 4H10L7.3 6.1L8.3 9.3L5.5 7.4L2.7 9.3L3.7 6.1L1 4H4.2L5.5 1Z" fill="currentColor"/>
               </svg>
               PRO
             </button>
-          ) : (
-            <button className="badge-free" onClick={() => { setLicenseMsg(null); setModal("license"); }}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          ) : showFreeBadge ? (
+            <button className="badge-free badge-free--warn" onClick={() => { setLicenseMsg(null); setModal("license"); }}>
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                 <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
-              {bundlesLeft} left · Get Pro
+              {bundlesLeft === 0 ? "No bundles left" : `${bundlesLeft} left`} · Get Pro
             </button>
-          )}
+          ) : null}
+
         </div>
+
       </header>
 
       {/* ── Body: sidebar + main ── */}
@@ -603,42 +722,52 @@ export default function App() {
           {/* Connect / Sync button */}
           <div className="sb-action-wrap">
             {ghState === "disconnected" && (
-              <button className="sb-connect-btn" onClick={handleConnectGitHub}>
-                {/* GitHub mark */}
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-                </svg>
-                Connect GitHub
-              </button>
-            )}
-            {ghState === "connecting" && (
-              <div className="sb-connecting">
-                <div className="sb-spinner"/>
-                <span>Waiting for auth…</span>
-              </div>
-            )}
-            {ghState === "connecting" && (
-              <div className="sb-manual-token">
-                <p className="sb-manual-label">Not redirecting? Paste token:</p>
-                <div className="sb-manual-row">
-                  <input
-                    className="sb-token-input"
-                    placeholder="ghp_xxxxxxxxxxxx"
-                    id="gh-token-input"
-                  />
-                  <button
-                    className="sb-token-submit"
-                    onClick={async () => {
-                      const input = document.getElementById("gh-token-input") as HTMLInputElement;
-                      const token = input?.value?.trim();
-                      if (!token) return;
-                      await invoke("store_github_token", { token });
-                      setGhToken(token);
-                      fetchGhUser(token);
-                    }}
-                  >Go</button>
+              <>
+                <button className="sb-connect-btn" onClick={handleConnectGitHub}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                  </svg>
+                  Connect GitHub
+                </button>
+                <div className="sb-manual-token">
+                  <p className="sb-manual-label">Or paste a token directly:</p>
+                  <div className="sb-manual-row">
+                    <input
+                      ref={tokenInputRef}
+                      className="sb-token-input"
+                      placeholder="ghp_xxxxxxxxxxxx"
+                      onKeyDown={e => { if (e.key === "Enter") handlePasteToken((e.target as HTMLInputElement).value.trim()); }}
+                    />
+                    <button
+                      className="sb-token-submit"
+                      onClick={() => handlePasteToken(tokenInputRef.current?.value.trim() ?? "")}
+                    >Go</button>
+                  </div>
                 </div>
-              </div>
+              </>
+            )}
+            {ghState === "connecting" && (
+              <>
+                <div className="sb-connecting">
+                  <div className="sb-spinner"/>
+                  <span>Waiting for auth…</span>
+                </div>
+                <div className="sb-manual-token">
+                  <p className="sb-manual-label">Or paste a token directly:</p>
+                  <div className="sb-manual-row">
+                    <input
+                      ref={tokenInputRef}
+                      className="sb-token-input"
+                      placeholder="ghp_xxxxxxxxxxxx"
+                      onKeyDown={e => { if (e.key === "Enter") handlePasteToken((e.target as HTMLInputElement).value.trim()); }}
+                    />
+                    <button
+                      className="sb-token-submit"
+                      onClick={() => handlePasteToken(tokenInputRef.current?.value.trim() ?? "")}
+                    >Go</button>
+                  </div>
+                </div>
+              </>
             )}
             {ghState === "fetching" && (
               <div className="sb-connecting">
@@ -670,52 +799,66 @@ export default function App() {
                 <svg width="28" height="28" viewBox="0 0 16 16" fill="currentColor" style={{opacity:.18,marginBottom:8}}>
                   <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
                 </svg>
-                <p>Connect GitHub to browse<br/>your repositories here</p>
+                {ghError
+                  ? <p className="sb-gh-error">{ghError}</p>
+                  : <p>Connect GitHub to browse<br/>your repositories here</p>
+                }
               </div>
             )}
 
             {ghState === "connected" && ghRepos.map(repo => (
               <div key={repo.id} className="sb-repo">
-                {/* Repo row */}
                 <button
-                  className={`sb-repo-row ${expandedRepo === repo.full_name ? "sb-repo-row--open" : ""}`}
+                  className={`sb-repo-row${expandedRepo === repo.full_name ? " sb-repo-row--open" : ""}`}
                   onClick={() => handleToggleRepo(repo)}
                 >
-                  <span className="sb-arrow">
-                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none"
-                      style={{ transform: expandedRepo === repo.full_name ? "rotate(90deg)" : "rotate(0deg)", transition: "transform .15s" }}>
-                      <path d="M2 1l4 3-4 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                  <span className="tree-arrow" style={{ transform: expandedRepo === repo.full_name ? "rotate(90deg)" : "rotate(0deg)" }}>
+                    <svg width="6" height="6" viewBox="0 0 6 6" fill="none">
+                      <path d="M1 1l4 2-4 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </span>
-                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{flexShrink:0,color:"var(--text-3)"}}>
-                    <path d="M2 4a1 1 0 011-1h2.5l1.5 1.5H11a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1V4z" stroke="currentColor" strokeWidth="1.2"/>
-                  </svg>
                   <span className="sb-repo-name">{repo.name}</span>
                   {repo.private && <span className="sb-private-tag">private</span>}
                 </button>
 
-                {/* Tree */}
                 {expandedRepo === repo.full_name && repoTrees[repo.full_name] && (
                   <div className="sb-tree">
-                    {repoTrees[repo.full_name].map(node => (
-                      <TreeNodeRow
-                        key={node.path}
-                        node={node}
-                        repoKey={repo.full_name}
-                        depth={0}
-                        expandedDirs={expandedDirs}
-                        selectedDir={selectedDir}
-                        onToggleDir={handleToggleDir}
-                        onSelectDir={handleSelectDir}
-                      />
-                    ))}
+                    {/* Root — selectable, no indent line above it */}
+                    <button
+                      className={`tree-dir tree-dir--root${selectedDir === `${repo.full_name}::__root__` ? " tree-dir--selected" : ""}`}
+                      style={{ paddingLeft: 8 }}
+                      onClick={() => handleSelectRepoRoot(repo)}
+                    >
+                      <span className="tree-arrow" style={{ visibility: "hidden" }}>
+                        <svg width="6" height="6" viewBox="0 0 6 6" fill="none">
+                          <path d="M1 1l4 2-4 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </span>
+                      <span className="tree-dir-name" style={{ color: selectedDir === `${repo.full_name}::__root__` ? "var(--accent)" : undefined }}>
+                        / (root)
+                      </span>
+                    </button>
+                    {/* All top-level nodes share one indent line */}
+                    <div className="tree-children-wrap" style={{ marginLeft: 14 }}>
+                      {repoTrees[repo.full_name].map(node => (
+                        <TreeNodeRow
+                          key={node.path}
+                          node={node}
+                          repoKey={repo.full_name}
+                          depth={0}
+                          expandedDirs={expandedDirs}
+                          selectedDir={selectedDir}
+                          onToggleDir={handleToggleDir}
+                          onSelectDir={handleSelectDir}
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
             ))}
           </div>
 
-          {/* Bundle selected dir CTA */}
           {selectedDir && (
             <div className="sb-bundle-cta">
               <div className="sb-selected-info">
@@ -787,7 +930,7 @@ export default function App() {
               <div className="stats-row">
                 <Stat label="Files" value={folderInfo.file_count} warn={!isPro && folderInfo.file_count > (license?.free_file_limit ?? 50)}/>
                 <Stat label="Folders" value={folderInfo.folder_count}/>
-                <Stat label="Size" value={`${folderInfo.size_kb.toFixed(0)} KB`}/>
+                <Stat label="Size" value={formatSize(folderInfo.size_kb)}/>
               </div>
               {!isPro && folderInfo.file_count > (license?.free_file_limit ?? 50) && (
                 <div className="limit-warning">
@@ -796,30 +939,37 @@ export default function App() {
                 </div>
               )}
               <div className="options-panel">
-                <p className="options-title">Options</p>
-                <div className="options-grid">
-                  <Toggle label="Respect .gitignore" description="Skip files listed in .gitignore"
-                    checked={options.respect_gitignore} onChange={v => setOptions({...options, respect_gitignore: v})}/>
-                  <Toggle label="Skip defaults" description="Exclude node_modules, .git, dist, build…"
-                    checked={options.skip_default_ignores} onChange={v => setOptions({...options, skip_default_ignores: v})}/>
-                  <Toggle label="Token count" description="Estimate context window usage"
-                    checked={options.include_token_count} onChange={v => setOptions({...options, include_token_count: v})}
-                    proOnly={!isPro} onProClick={() => setModal("license")}/>
-                  <div className="option-row">
-                    <div>
-                      <p className="option-label">Max file size</p>
-                      <p className="option-desc">Skip files larger than this threshold</p>
-                    </div>
-                    <div className="size-input-wrap">
-                      <input className="size-input" type="number" min={10} max={10000} value={options.max_file_size_kb}
-                        onChange={e => setOptions({...options, max_file_size_kb: Number(e.target.value)})}/>
-                      <span className="size-unit">KB</span>
+                <button className="options-toggle" onClick={() => setOptionsOpen(o => !o)}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+                    style={{transform: optionsOpen ? "rotate(90deg)" : "rotate(0deg)", transition: "transform .15s", flexShrink: 0}}>
+                    <path d="M3 1l5 5-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Options
+                </button>
+                {optionsOpen && (
+                  <div className="options-grid">
+                    <Toggle label="Respect .gitignore" description="Skip files listed in .gitignore"
+                      checked={options.respect_gitignore} onChange={v => setOptions({...options, respect_gitignore: v})}/>
+                    <Toggle label="Skip defaults" description="Exclude node_modules, .git, dist, build…"
+                      checked={options.skip_default_ignores} onChange={v => setOptions({...options, skip_default_ignores: v})}/>
+                    <Toggle label="Token count" description="Estimate context window usage"
+                      checked={options.include_token_count} onChange={v => setOptions({...options, include_token_count: v})}
+                      proOnly={!isPro} onProClick={() => setModal("license")}/>
+                    <div className="option-row">
+                      <div>
+                        <p className="option-label">Max file size</p>
+                        <p className="option-desc">Skip files larger than this threshold</p>
+                      </div>
+                      <div className="size-input-wrap">
+                        <input className="size-input" type="number" min={10} max={10000} value={options.max_file_size_kb}
+                          onChange={e => setOptions({...options, max_file_size_kb: Number(e.target.value)})}/>
+                        <span className="size-unit">KB</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
-              {/* ── Feature checkboxes — below options, same row style as image ── */}
               <div className="feature-checks">
                 <label className="feat-check-row">
                   <input
@@ -830,7 +980,6 @@ export default function App() {
                   />
                   <div>
                     <span className="feat-check-label">Structure map only</span>
-                    {/* <span className="feat-check-desc">Output folder tree without file contents — ideal for planning or sharing layout</span> */}
                   </div>
                 </label>
                 <label className="feat-check-row">
@@ -842,7 +991,6 @@ export default function App() {
                   />
                   <div>
                     <span className="feat-check-label">Choose folders to exclude</span>
-                    {/* <span className="feat-check-desc">Review and uncheck folders before bundling</span> */}
                   </div>
                 </label>
               </div>
@@ -895,7 +1043,7 @@ export default function App() {
                           const expandInTree = (nodes: any[]): any[] =>
                             nodes.map((x: any) => x.path === path
                               ? { ...x, expanded: !x.expanded, children: x.children?.length
-                                  ? x.children  // already fetched, just toggle
+                                  ? x.children
                                   : sub.map((s: any) => ({
                                       ...s,
                                       included: !savedExclusions.includes(s.path),
@@ -949,7 +1097,7 @@ export default function App() {
                 <ResultStat label="Files processed" value={result.file_count}/>
                 <ResultStat label="Folders" value={result.folder_count}/>
                 <ResultStat label="Binary skipped" value={result.skipped_binary}/>
-                <ResultStat label="Output size" value={`${result.total_size_kb.toFixed(1)} KB`}/>
+                <ResultStat label="Output size" value={formatSize(result.total_size_kb)}/>
                 {result.token_estimate > 0 && <ResultStat label="~Tokens" value={result.token_estimate.toLocaleString()} highlight/>}
               </div>
               {result.token_estimate > 0 && <p className="token-note">Context window estimate — varies by model</p>}
@@ -973,7 +1121,7 @@ export default function App() {
             </div>
             <div className="download-info">
               <button className="download-filename" onClick={handleOpen}>{filename}</button>
-              <span className="download-size">{result.total_size_kb.toFixed(1)} KB · Click to open</span>
+              <span className="download-size">{formatSize(result.total_size_kb)} · Click to open</span>
             </div>
           </div>
           <div className="download-bar-right">
@@ -1006,12 +1154,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* <footer className="footer">
-        <span>CODEXT v0.1.0</span>
-        <span className="footer-dot">·</span>
-        <span>{isPro ? "Pro License Active" : `Free — ${bundlesLeft} bundles left`}</span>
-      </footer> */}
 
       {/* ════ MODALS ════ */}
 
@@ -1261,38 +1403,36 @@ function TreeNodeRow({ node, repoKey, depth, expandedDirs, selectedDir, onToggle
   const dirKey = `${repoKey}::${node.path}`;
   const isExpanded = expandedDirs.has(dirKey);
   const isSelected = selectedDir === dirKey;
+  // Each depth level = 12px. Indent lines sit at depth*12 + 6 (centred on the arrow).
+  const BASE = 8;
+  const STEP = 12;
+  const rowIndent = BASE + depth * STEP;
 
   if (node.type === "file") {
     return (
-      <div className="tree-file" style={{ paddingLeft: 10 + depth * 14 }}>
-        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{flexShrink:0,color:"var(--text-3)"}}>
-          <rect x="2" y="1" width="8" height="10" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-        </svg>
+      <div className="tree-file" style={{ paddingLeft: rowIndent + 16 }}>
+        <span className="tree-bullet" />
         <span className="tree-file-name">{node.name}</span>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="tree-dir-wrap">
       <button
-        className={`tree-dir ${isSelected ? "tree-dir--selected" : ""}`}
-        style={{ paddingLeft: 10 + depth * 14 }}
+        className={`tree-dir${isSelected ? " tree-dir--selected" : ""}`}
+        style={{ paddingLeft: rowIndent }}
         onClick={() => { onToggleDir(repoKey, node); onSelectDir(repoKey, node); }}
       >
-        <span className="sb-arrow">
-          <svg width="7" height="7" viewBox="0 0 8 8" fill="none"
-            style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform .12s" }}>
-            <path d="M2 1l4 3-4 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+        <span className="tree-arrow" style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}>
+          <svg width="6" height="6" viewBox="0 0 6 6" fill="none">
+            <path d="M1 1l4 2-4 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </span>
-        <svg width="11" height="11" viewBox="0 0 14 14" fill="none" style={{flexShrink:0,color: isSelected ? "var(--accent)" : "var(--text-3)"}}>
-          <path d="M2 4a1 1 0 011-1h2.5l1.5 1.5H11a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1V4z" stroke="currentColor" strokeWidth="1.2"/>
-        </svg>
         <span className="tree-dir-name">{node.name}</span>
       </button>
       {isExpanded && node.children && (
-        <div>
+        <div className="tree-children-wrap" style={{ marginLeft: rowIndent + 6 }}>
           {node.children.map(child => (
             <TreeNodeRow key={child.path} node={child} repoKey={repoKey} depth={depth + 1}
               expandedDirs={expandedDirs} selectedDir={selectedDir}
@@ -1303,6 +1443,7 @@ function TreeNodeRow({ node, repoKey, depth, expandedDirs, selectedDir, onToggle
     </div>
   );
 }
+
 function FolderPickerRow({ folder, depth, onToggle, onExpand }: {
   folder: any; depth: number;
   onToggle: (path: string) => void;
@@ -1358,4 +1499,33 @@ function FolderPickerRow({ folder, depth, onToggle, onExpand }: {
       ))}
     </div>
   );
+}
+
+// ─── GitHub tree builder ──────────────────────────────────────────────────────
+
+function buildTree(flatItems: { path: string; type: string }[]): TreeNode[] {
+  const root: TreeNode[] = [];
+  const map: Record<string, TreeNode> = {};
+
+  for (const item of flatItems) {
+    const parts = item.path.split("/");
+    const name = parts[parts.length - 1];
+    const node: TreeNode = {
+      name,
+      path: item.path,
+      type: item.type === "tree" ? "dir" : "file",
+      children: item.type === "tree" ? [] : undefined,
+    };
+    map[item.path] = node;
+
+    if (parts.length === 1) {
+      root.push(node);
+    } else {
+      const parentPath = parts.slice(0, -1).join("/");
+      if (map[parentPath]?.children) {
+        map[parentPath].children!.push(node);
+      }
+    }
+  }
+  return root;
 }

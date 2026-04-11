@@ -865,7 +865,7 @@ pub mod commands {
             output.push_str("1. Use [ID] to track file locations in the PROJECT MAP.\n");
             output.push_str("2. Always return the FULL file content for any requested change.\n");
             output.push_str("3. Use the provided [EXTENSION] for code block syntax.\n");
-            output.push_str("4. EXCLUSION RULE: Do NOT include CODEXT metadata (e.g., [FILE_START], ID, PATH, [FILE_END]) inside the code blocks you generate. Output ONLY the raw source code.\n");
+            output.push_str("4. Do NOT include CODEXT metadata (e.g., [FILE_START], ID, PATH, [FILE_END]) in file content.\n");
         }
         output.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n");
 
