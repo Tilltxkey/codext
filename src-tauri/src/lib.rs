@@ -944,13 +944,11 @@ pub mod commands {
         let mut output = String::new();
 
         // ── Global Protocol Header ────────────────────────────────────
-        output.push_str("╔══════════════════════════════════════════════════════════════╗\n");
         if options.structure_only {
-            output.push_str("║           CODEXT: PROJECT STRUCTURE MAP                      ║\n");
+            output.push_str("           CODEXT: PROJECT STRUCTURE MAP                      ");
         } else {
-            output.push_str("║              CODEXT: UNIVERSAL CODEBASE STREAM               ║\n");
+            output.push_str("              CODEXT: CODEBASE CODE CONTEXT               \n");
         }
-        output.push_str("╚══════════════════════════════════════════════════════════════╝\n\n");
         output.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
         if options.structure_only {
             output.push_str("CODEXT PROTOCOL:\n");
@@ -959,9 +957,9 @@ pub mod commands {
         } else {
             output.push_str("CODEXT PROTOCOL:\n");
             output.push_str("1. Use [ID] to track file locations in the PROJECT MAP.\n");
-            output.push_str("2. Always return the FULL file content for any requested change.\n");
-            output.push_str("3. Use the provided [EXTENSION] for code block syntax.\n");
-            output.push_str("4. Do NOT include CODEXT metadata (e.g., [FILE_START], ID, PATH, [FILE_END]) in file content.\n");
+            output.push_str("2. Use the provided [EXTENSION] for code block syntax.\n");
+            output.push_str("3. Do NOT include CODEXT metadata (e.g., [FILE_START], ID, PATH, [FILE_END]) in file content.\n");
+            output.push_str("4. Always return the FULL file content for any requested change.\n");
         }
         output.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n");
 
@@ -1156,6 +1154,14 @@ use tauri::{Emitter, Listener};
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // Second instance tried to launch — focus the existing window instead
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())

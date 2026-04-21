@@ -944,13 +944,12 @@ export default function App() {
 
         {/* ── Left: logo ── */}
         <div className="header-logo">
-          <svg className="logo-mark" width="26" height="20" viewBox="0 0 377 294" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M13.5 288.3V11.7H65.7V32.4H37.2V267.3H65.7V288.3H13.5Z" fill="#DCFF00"/>
-            <path d="M365.7 288.3H313.5V267.3H342V32.4H313.5V11.7H365.7V288.3Z" fill="#DCFF00"/>
-            <rect x="86.6344" y="120.332" width="25" height="150" rx="4" transform="rotate(-60 86.6344 120.332)" fill="#DCFF00"/>
-            <rect x="99.5" y="195.651" width="25" height="150" rx="4" transform="rotate(-120 99.5 195.651)" fill="#DCFF00"/>
-            <rect x="146" y="72" width="25" height="150" rx="4" fill="#DCFF00"/>
+          <svg width="272" height="286" viewBox="0 0 272 286" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="47.589" height="285.537" rx="23.7945" transform="matrix(0.500005 -0.866023 0.866028 0.499995 0 91.9984)" fill="#DCFF00"/>
+            <rect width="47.589" height="285.537" rx="23.7945" transform="matrix(-0.500005 -0.866023 0.866028 -0.499995 24.4871 235.377)" fill="#DCFF00"/>
+            <rect x="113.002" width="47.5896" height="285.534" rx="23.7948" fill="#DCFF00"/>
           </svg>
+
           <span className="logo">CODEXT</span>
         </div>
 
