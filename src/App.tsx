@@ -82,10 +82,403 @@ const POLL_MAX_ATTEMPTS = 20;
 // Free tier threshold — badge only appears when this many bundles or fewer remain
 const BADGE_WARN_THRESHOLD = 3;
 
+
+// ─── i18n ─────────────────────────────────────────────────────────────────────
+
+type Lang = "en" | "fr" | "es" | "de" | "zh" | "ar";
+
+const LANGS: { code: Lang; label: string }[] = [
+  { code: "en", label: "EN" },
+  { code: "fr", label: "FR" },
+  { code: "es", label: "ES" },
+  { code: "de", label: "DE" },
+  { code: "zh", label: "中文" },
+  { code: "ar", label: "AR" },
+];
+
+const TRANSLATIONS: Record<Lang, Record<string, string>> = {
+  en: {
+    recentFolders: "Recent folders", clearAll: "Clear all",
+    noRecentYet: "No recent folders yet", browseFolder: "Browse folder",
+    connectGitHub: "Connect GitHub to browse your repositories here",
+    pasteToken: "Paste a token directly:", waitingAuth: "Waiting for auth…",
+    loadingRepos: "Loading repos…", fetchLatest: "Fetch latest",
+    cloningDots: "Cloning…", cloneBundle: "Clone & Bundle",
+    pasteTokenHere: "Paste token…   ghp_",
+    dropLabel: "Drop your project folder here", dropOr: "or",
+    browseFolderBtn: "Browse folder",
+    freeNote: (used: string, total: string, files: string) => `Free: ${used} of ${total} bundles · up to ${files} files`,
+    fileLimitWarn: (n: string, cap: string) => `⚠ ${n} files — free tier caps at ${cap}.`,
+    upgradePro: "Upgrade to Pro →",
+    optionsTitle: "Options",
+    respectGitignore: "Respect .gitignore", respectDesc: "Skip files listed in .gitignore",
+    skipDefaults: "Skip defaults", skipDesc: "Exclude node_modules, .git, dist, build…",
+    tokenCount: "Token count", tokenDesc: "Estimate context window usage",
+    maxFileSize: "Max file size", skipLarger: "Skip files larger than this threshold",
+    structureOnly: "Structure map only", chooseFolders: "Choose folders to exclude",
+    pickFolderBtn: "Pick folders", bundleBtn: "Bundle to .txt",
+    bundlingLabel: "Bundling your codebase…",
+    bundleComplete: "Bundle complete",
+    filesProcessed: "Files processed", binarySkipped: "Binary skipped", outputSize: "Output size",
+    tokenNote: "Context window estimate — varies by model",
+    bundleAnother: "Bundle another folder",
+    clickToOpen: "Click to open", skipVersion: "Skip this version", updateAvail: "Update available",
+    noBundlesLeft: "No bundles left", bundlesLeft: (n: string) => `${n} left`, getPro: "Get Pro",
+    proActivated: "Pro activated automatically!",
+    waitingPayment: "Waiting for payment…", completePurchase: "Complete your purchase in the browser.",
+    autoUnlock: "This will unlock automatically the moment payment is confirmed.",
+    checkingEvery: (s: string, n: string) => `Checking every ${s}s · ${n} checks remaining`,
+    alreadyHaveKey: "Already have a key?", activate: "Activate",
+    cancelActivate: "Cancel — I'll activate later",
+    timedOut: "Timed out", noPaymentDetected: "Didn't detect a payment. Check your email for your license key and paste it below.",
+    close: "Close", chooseExclude: "Choose folders to exclude",
+    excludeDesc: "Uncheck folders you don't want bundled. Greyed entries are already excluded by your options.",
+    rememberExcl: "Remember these exclusions", rememberDesc: "Apply the same folder exclusions automatically on future bundles",
+    bundleSelected: "Bundle selected folders", cancel: "Cancel",
+    noSubfolders: "No subfolders found in this project.",
+    freeLimitReached: "Free limit reached",
+    bundlesUsed: (n: string) => `You've used all ${n} free bundles.`,
+    filesDetected: (n: string, cap: string) => `${n} files detected — free tier caps at ${cap}.`,
+    outputWould: (n: string, cap: string) => `Output would be ${n} KB — free tier caps at ${cap} KB.`,
+    getPro12: "Get Pro — $12", proUnlock: "Get Pro — Unlock everything instantly",
+    oneTime: "one-time · no subscription · yours forever · auto-activates instantly.",
+    unlockPro: "Unlock CODEXT Pro",
+    freeLabel: "Free", proLabel: "Pro",
+    upToFiles: (n: string) => `Up to ${n} files`, upToKb: (n: string) => `Up to ${n} KB output`,
+    bundlesTotal: (n: string) => `${n} bundles total`,
+    unlimitedFiles: "Unlimited files", unlimitedOutput: "Unlimited output",
+    unlimitedBundles: "Unlimited bundles", tokenCounting: "Token counting", autoActivates: "Auto-activates instantly",
+    youreSet: "You're all set", fullAccess: "Unlimited bundles, unlimited files, full token counting.",
+    licenseKeyLabel: "License key", deviceId: "Device ID", removeLicense: "Remove license from this device",
+    licenseActivated: "License activated! You now have full Pro access.",
+    licenseRemoved: "License removed from this device.",
+    cantOpenBrowser: "Could not open browser. Please visit codext-web.vercel.app/buy",
+    justNow: "just now", mAgo: (n: string) => `${n}m ago`, hAgo: (n: string) => `${n}h ago`, dAgo: (n: string) => `${n}d ago`,
+    rootDir: "/ (root)", private: "private", autoExcluded: "auto-excluded",
+    download: "Download",
+    repositories: "Repositories",
+  },
+  fr: {
+    recentFolders: "Dossiers récents", clearAll: "Tout effacer",
+    noRecentYet: "Aucun dossier récent", browseFolder: "Parcourir",
+    connectGitHub: "Connectez GitHub pour parcourir vos dépôts",
+    pasteToken: "Coller un token :", waitingAuth: "En attente d'auth…",
+    loadingRepos: "Chargement…", fetchLatest: "Actualiser",
+    cloningDots: "Clonage…", cloneBundle: "Cloner & Bundler",
+    pasteTokenHere: "Coller le token…   ghp_",
+    dropLabel: "Déposez votre projet ici", dropOr: "ou",
+    browseFolderBtn: "Parcourir",
+    freeNote: (used: string, total: string, files: string) => `Gratuit : ${used}/${total} bundles · max ${files} fichiers`,
+    fileLimitWarn: (n: string, cap: string) => `⚠ ${n} fichiers — limite gratuite : ${cap}.`,
+    upgradePro: "Passer à Pro →",
+    optionsTitle: "Options",
+    respectGitignore: "Respecter .gitignore", respectDesc: "Ignorer les fichiers listés dans .gitignore",
+    skipDefaults: "Ignorer les défauts", skipDesc: "Exclure node_modules, .git, dist, build…",
+    tokenCount: "Comptage de tokens", tokenDesc: "Estimer l'usage de la fenêtre de contexte",
+    maxFileSize: "Taille max des fichiers", skipLarger: "Ignorer les fichiers plus lourds que ce seuil",
+    structureOnly: "Carte de structure seulement", chooseFolders: "Choisir les dossiers à exclure",
+    pickFolderBtn: "Choisir dossiers", bundleBtn: "Bundler en .txt",
+    bundlingLabel: "Bundling en cours…",
+    bundleComplete: "Bundle terminé",
+    filesProcessed: "Fichiers traités", binarySkipped: "Binaires ignorés", outputSize: "Taille de sortie",
+    tokenNote: "Estimation — varie selon le modèle",
+    bundleAnother: "Bundler un autre dossier",
+    clickToOpen: "Cliquer pour ouvrir", skipVersion: "Ignorer cette version", updateAvail: "Mise à jour disponible",
+    noBundlesLeft: "Plus de bundles", bundlesLeft: (n: string) => `${n} restants`, getPro: "Obtenir Pro",
+    proActivated: "Pro activé automatiquement !",
+    waitingPayment: "En attente du paiement…", completePurchase: "Complétez votre achat dans le navigateur.",
+    autoUnlock: "Cela se déverrouillera automatiquement dès que le paiement sera confirmé.",
+    checkingEvery: (s: string, n: string) => `Vérif toutes les ${s}s · ${n} restantes`,
+    alreadyHaveKey: "Vous avez déjà une clé ?", activate: "Activer",
+    cancelActivate: "Annuler — j'activerai plus tard",
+    timedOut: "Délai dépassé", noPaymentDetected: "Paiement non détecté. Vérifiez votre email pour la clé de licence.",
+    close: "Fermer", chooseExclude: "Choisir les dossiers à exclure",
+    excludeDesc: "Décochez les dossiers à exclure. Les entrées grisées sont déjà exclues.",
+    rememberExcl: "Mémoriser ces exclusions", rememberDesc: "Appliquer automatiquement ces exclusions aux prochains bundles",
+    bundleSelected: "Bundler les dossiers sélectionnés", cancel: "Annuler",
+    noSubfolders: "Aucun sous-dossier trouvé.",
+    freeLimitReached: "Limite gratuite atteinte",
+    bundlesUsed: (n: string) => `Vous avez utilisé les ${n} bundles gratuits.`,
+    filesDetected: (n: string, cap: string) => `${n} fichiers — limite gratuite : ${cap}.`,
+    outputWould: (n: string, cap: string) => `Sortie de ${n} Ko — limite gratuite : ${cap} Ko.`,
+    getPro12: "Obtenir Pro — 12 $", proUnlock: "Obtenir Pro — Tout débloquer instantanément",
+    oneTime: "paiement unique · sans abonnement · à vie · activation instantanée.",
+    unlockPro: "Débloquer CODEXT Pro",
+    freeLabel: "Gratuit", proLabel: "Pro",
+    upToFiles: (n: string) => `Jusqu'à ${n} fichiers`, upToKb: (n: string) => `Jusqu'à ${n} Ko de sortie`,
+    bundlesTotal: (n: string) => `${n} bundles au total`,
+    unlimitedFiles: "Fichiers illimités", unlimitedOutput: "Sortie illimitée",
+    unlimitedBundles: "Bundles illimités", tokenCounting: "Comptage de tokens", autoActivates: "Activation instantanée",
+    youreSet: "Tout est prêt", fullAccess: "Bundles illimités, fichiers illimités, comptage de tokens.",
+    licenseKeyLabel: "Clé de licence", deviceId: "ID de l'appareil", removeLicense: "Supprimer la licence de cet appareil",
+    licenseActivated: "Licence activée ! Vous avez maintenant un accès Pro complet.",
+    licenseRemoved: "Licence supprimée de cet appareil.",
+    cantOpenBrowser: "Impossible d'ouvrir le navigateur. Visitez codext-web.vercel.app/buy",
+    justNow: "à l'instant", mAgo: (n: string) => `il y a ${n}min`, hAgo: (n: string) => `il y a ${n}h`, dAgo: (n: string) => `il y a ${n}j`,
+    rootDir: "/ (racine)", private: "privé", autoExcluded: "exclu auto",
+    download: "Télécharger",
+    repositories: "Dépôts",
+  },
+  es: {
+    recentFolders: "Carpetas recientes", clearAll: "Borrar todo",
+    noRecentYet: "Sin carpetas recientes", browseFolder: "Explorar",
+    connectGitHub: "Conecta GitHub para explorar tus repositorios",
+    pasteToken: "Pegar token:", waitingAuth: "Esperando auth…",
+    loadingRepos: "Cargando repos…", fetchLatest: "Actualizar",
+    cloningDots: "Clonando…", cloneBundle: "Clonar y Empaquetar",
+    pasteTokenHere: "Pegar token…   ghp_",
+    dropLabel: "Suelta tu carpeta de proyecto aquí", dropOr: "o",
+    browseFolderBtn: "Explorar carpeta",
+    freeNote: (used: string, total: string, files: string) => `Gratis: ${used} de ${total} bundles · hasta ${files} archivos`,
+    fileLimitWarn: (n: string, cap: string) => `⚠ ${n} archivos — límite gratuito: ${cap}.`,
+    upgradePro: "Mejorar a Pro →",
+    optionsTitle: "Opciones",
+    respectGitignore: "Respetar .gitignore", respectDesc: "Omitir archivos en .gitignore",
+    skipDefaults: "Omitir por defecto", skipDesc: "Excluir node_modules, .git, dist, build…",
+    tokenCount: "Conteo de tokens", tokenDesc: "Estimar uso de ventana de contexto",
+    maxFileSize: "Tamaño máx. de archivo", skipLarger: "Omitir archivos mayores a este umbral",
+    structureOnly: "Solo mapa de estructura", chooseFolders: "Elegir carpetas a excluir",
+    pickFolderBtn: "Elegir carpetas", bundleBtn: "Empaquetar en .txt",
+    bundlingLabel: "Empaquetando…",
+    bundleComplete: "Paquete completo",
+    filesProcessed: "Archivos procesados", binarySkipped: "Binarios omitidos", outputSize: "Tamaño de salida",
+    tokenNote: "Estimación — varía según el modelo",
+    bundleAnother: "Empaquetar otra carpeta",
+    clickToOpen: "Clic para abrir", skipVersion: "Omitir versión", updateAvail: "Actualización disponible",
+    noBundlesLeft: "Sin bundles", bundlesLeft: (n: string) => `${n} restantes`, getPro: "Obtener Pro",
+    proActivated: "¡Pro activado automáticamente!",
+    waitingPayment: "Esperando pago…", completePurchase: "Completa tu compra en el navegador.",
+    autoUnlock: "Se desbloqueará automáticamente al confirmar el pago.",
+    checkingEvery: (s: string, n: string) => `Comprobando cada ${s}s · ${n} restantes`,
+    alreadyHaveKey: "¿Ya tienes una clave?", activate: "Activar",
+    cancelActivate: "Cancelar — activaré más tarde",
+    timedOut: "Tiempo agotado", noPaymentDetected: "Pago no detectado. Revisa tu email para la clave de licencia.",
+    close: "Cerrar", chooseExclude: "Elegir carpetas a excluir",
+    excludeDesc: "Desmarca las carpetas que no quieres empaquetar.",
+    rememberExcl: "Recordar exclusiones", rememberDesc: "Aplicar las mismas exclusiones automáticamente en bundles futuros",
+    bundleSelected: "Empaquetar carpetas seleccionadas", cancel: "Cancelar",
+    noSubfolders: "No se encontraron subcarpetas.",
+    freeLimitReached: "Límite gratuito alcanzado",
+    bundlesUsed: (n: string) => `Has usado los ${n} bundles gratuitos.`,
+    filesDetected: (n: string, cap: string) => `${n} archivos — límite gratuito: ${cap}.`,
+    outputWould: (n: string, cap: string) => `La salida sería ${n} KB — límite gratuito: ${cap} KB.`,
+    getPro12: "Obtener Pro — $12", proUnlock: "Obtener Pro — Desbloquear todo al instante",
+    oneTime: "pago único · sin suscripción · tuyo para siempre · activación instantánea.",
+    unlockPro: "Desbloquear CODEXT Pro",
+    freeLabel: "Gratis", proLabel: "Pro",
+    upToFiles: (n: string) => `Hasta ${n} archivos`, upToKb: (n: string) => `Hasta ${n} KB de salida`,
+    bundlesTotal: (n: string) => `${n} bundles en total`,
+    unlimitedFiles: "Archivos ilimitados", unlimitedOutput: "Salida ilimitada",
+    unlimitedBundles: "Bundles ilimitados", tokenCounting: "Conteo de tokens", autoActivates: "Activación instantánea",
+    youreSet: "Todo listo", fullAccess: "Bundles ilimitados, archivos ilimitados, conteo de tokens.",
+    licenseKeyLabel: "Clave de licencia", deviceId: "ID del dispositivo", removeLicense: "Eliminar licencia de este dispositivo",
+    licenseActivated: "¡Licencia activada! Ahora tienes acceso Pro completo.",
+    licenseRemoved: "Licencia eliminada de este dispositivo.",
+    cantOpenBrowser: "No se pudo abrir el navegador. Visita codext-web.vercel.app/buy",
+    justNow: "ahora mismo", mAgo: (n: string) => `hace ${n}min`, hAgo: (n: string) => `hace ${n}h`, dAgo: (n: string) => `hace ${n}d`,
+    rootDir: "/ (raíz)", private: "privado", autoExcluded: "excl. auto",
+    download: "Descargar",
+    repositories: "Repositorios",
+  },
+  de: {
+    recentFolders: "Zuletzt geöffnet", clearAll: "Alle löschen",
+    noRecentYet: "Noch keine Ordner", browseFolder: "Durchsuchen",
+    connectGitHub: "GitHub verbinden, um Repos zu durchsuchen",
+    pasteToken: "Token einfügen:", waitingAuth: "Warte auf Auth…",
+    loadingRepos: "Lade Repos…", fetchLatest: "Aktualisieren",
+    cloningDots: "Klone…", cloneBundle: "Klonen & Bündeln",
+    pasteTokenHere: "Token einfügen…   ghp_",
+    dropLabel: "Projektordner hier ablegen", dropOr: "oder",
+    browseFolderBtn: "Ordner wählen",
+    freeNote: (used: string, total: string, files: string) => `Kostenlos: ${used}/${total} Bundles · bis zu ${files} Dateien`,
+    fileLimitWarn: (n: string, cap: string) => `⚠ ${n} Dateien — kostenloses Limit: ${cap}.`,
+    upgradePro: "Auf Pro upgraden →",
+    optionsTitle: "Optionen",
+    respectGitignore: ".gitignore beachten", respectDesc: "In .gitignore gelistete Dateien überspringen",
+    skipDefaults: "Standards überspringen", skipDesc: "node_modules, .git, dist, build… ausschließen",
+    tokenCount: "Token-Zählung", tokenDesc: "Kontextfensternutzung schätzen",
+    maxFileSize: "Max. Dateigröße", skipLarger: "Dateien größer als diesen Wert überspringen",
+    structureOnly: "Nur Strukturkarte", chooseFolders: "Ordner zum Ausschließen wählen",
+    pickFolderBtn: "Ordner wählen", bundleBtn: "Als .txt bündeln",
+    bundlingLabel: "Bündelung läuft…",
+    bundleComplete: "Bundle abgeschlossen",
+    filesProcessed: "Verarbeitete Dateien", binarySkipped: "Binärdateien übersprungen", outputSize: "Ausgabegröße",
+    tokenNote: "Schätzung — variiert je nach Modell",
+    bundleAnother: "Weiteren Ordner bündeln",
+    clickToOpen: "Zum Öffnen klicken", skipVersion: "Version überspringen", updateAvail: "Update verfügbar",
+    noBundlesLeft: "Keine Bundles mehr", bundlesLeft: (n: string) => `${n} übrig`, getPro: "Pro holen",
+    proActivated: "Pro automatisch aktiviert!",
+    waitingPayment: "Warte auf Zahlung…", completePurchase: "Kauf im Browser abschließen.",
+    autoUnlock: "Schaltet automatisch frei, sobald die Zahlung bestätigt wird.",
+    checkingEvery: (s: string, n: string) => `Prüfe alle ${s}s · noch ${n} Versuche`,
+    alreadyHaveKey: "Haben Sie schon einen Schlüssel?", activate: "Aktivieren",
+    cancelActivate: "Abbrechen — später aktivieren",
+    timedOut: "Zeitüberschreitung", noPaymentDetected: "Keine Zahlung erkannt. Prüfen Sie Ihre E-Mail für den Lizenzschlüssel.",
+    close: "Schließen", chooseExclude: "Ordner zum Ausschließen wählen",
+    excludeDesc: "Haken entfernen bei Ordnern, die nicht gebündelt werden sollen.",
+    rememberExcl: "Ausschlüsse merken", rememberDesc: "Diese Ausschlüsse bei zukünftigen Bundles automatisch anwenden",
+    bundleSelected: "Ausgewählte Ordner bündeln", cancel: "Abbrechen",
+    noSubfolders: "Keine Unterordner gefunden.",
+    freeLimitReached: "Kostenloses Limit erreicht",
+    bundlesUsed: (n: string) => `Sie haben alle ${n} kostenlosen Bundles verwendet.`,
+    filesDetected: (n: string, cap: string) => `${n} Dateien — kostenloses Limit: ${cap}.`,
+    outputWould: (n: string, cap: string) => `Ausgabe wäre ${n} KB — Limit: ${cap} KB.`,
+    getPro12: "Pro holen — 12 $", proUnlock: "Pro holen — Alles sofort freischalten",
+    oneTime: "Einmalzahlung · kein Abo · dauerhaft · sofortige Aktivierung.",
+    unlockPro: "CODEXT Pro freischalten",
+    freeLabel: "Kostenlos", proLabel: "Pro",
+    upToFiles: (n: string) => `Bis zu ${n} Dateien`, upToKb: (n: string) => `Bis zu ${n} KB Ausgabe`,
+    bundlesTotal: (n: string) => `${n} Bundles gesamt`,
+    unlimitedFiles: "Unbegrenzte Dateien", unlimitedOutput: "Unbegrenzte Ausgabe",
+    unlimitedBundles: "Unbegrenzte Bundles", tokenCounting: "Token-Zählung", autoActivates: "Sofortige Aktivierung",
+    youreSet: "Alles bereit", fullAccess: "Unbegrenzte Bundles, Dateien und Token-Zählung.",
+    licenseKeyLabel: "Lizenzschlüssel", deviceId: "Geräte-ID", removeLicense: "Lizenz von diesem Gerät entfernen",
+    licenseActivated: "Lizenz aktiviert! Sie haben jetzt vollen Pro-Zugang.",
+    licenseRemoved: "Lizenz von diesem Gerät entfernt.",
+    cantOpenBrowser: "Browser konnte nicht geöffnet werden. Besuchen Sie codext-web.vercel.app/buy",
+    justNow: "gerade eben", mAgo: (n: string) => `vor ${n}min`, hAgo: (n: string) => `vor ${n}h`, dAgo: (n: string) => `vor ${n}T`,
+    rootDir: "/ (Wurzel)", private: "privat", autoExcluded: "auto ausgeschl.",
+    download: "Herunterladen",
+    repositories: "Repositories",
+  },
+  zh: {
+    recentFolders: "最近文件夹", clearAll: "清除全部",
+    noRecentYet: "暂无最近文件夹", browseFolder: "浏览",
+    connectGitHub: "连接 GitHub 以浏览您的仓库",
+    pasteToken: "粘贴 Token：", waitingAuth: "等待授权…",
+    loadingRepos: "加载仓库…", fetchLatest: "刷新",
+    cloningDots: "克隆中…", cloneBundle: "克隆并打包",
+    pasteTokenHere: "粘贴 Token…   ghp_",
+    dropLabel: "将项目文件夹拖放至此", dropOr: "或",
+    browseFolderBtn: "浏览文件夹",
+    freeNote: (used: string, total: string, files: string) => `免费：${used}/${total} 包 · 最多 ${files} 个文件`,
+    fileLimitWarn: (n: string, cap: string) => `⚠ ${n} 个文件 — 免费上限：${cap}。`,
+    upgradePro: "升级至 Pro →",
+    optionsTitle: "选项",
+    respectGitignore: "遵守 .gitignore", respectDesc: "跳过 .gitignore 中列出的文件",
+    skipDefaults: "跳过默认项", skipDesc: "排除 node_modules、.git、dist、build…",
+    tokenCount: "Token 计数", tokenDesc: "估算上下文窗口使用量",
+    maxFileSize: "最大文件大小", skipLarger: "跳过超过此阈值的文件",
+    structureOnly: "仅结构图", chooseFolders: "选择要排除的文件夹",
+    pickFolderBtn: "选择文件夹", bundleBtn: "打包为 .txt",
+    bundlingLabel: "打包中…",
+    bundleComplete: "打包完成",
+    filesProcessed: "已处理文件", binarySkipped: "已跳过二进制", outputSize: "输出大小",
+    tokenNote: "上下文窗口估算 — 因模型而异",
+    bundleAnother: "打包另一个文件夹",
+    clickToOpen: "点击打开", skipVersion: "跳过此版本", updateAvail: "有可用更新",
+    noBundlesLeft: "无剩余包", bundlesLeft: (n: string) => `剩余 ${n}`, getPro: "获取 Pro",
+    proActivated: "Pro 已自动激活！",
+    waitingPayment: "等待付款…", completePurchase: "在浏览器中完成购买。",
+    autoUnlock: "付款确认后将自动解锁。",
+    checkingEvery: (s: string, n: string) => `每 ${s}s 检查一次 · 剩余 ${n} 次`,
+    alreadyHaveKey: "已有密钥？", activate: "激活",
+    cancelActivate: "取消 — 稍后激活",
+    timedOut: "超时", noPaymentDetected: "未检测到付款。请查看您的邮箱获取许可证密钥。",
+    close: "关闭", chooseExclude: "选择要排除的文件夹",
+    excludeDesc: "取消勾选不想打包的文件夹。灰色条目已被选项排除。",
+    rememberExcl: "记住这些排除", rememberDesc: "在未来的打包中自动应用相同的文件夹排除",
+    bundleSelected: "打包所选文件夹", cancel: "取消",
+    noSubfolders: "此项目中未找到子文件夹。",
+    freeLimitReached: "已达免费限制",
+    bundlesUsed: (n: string) => `您已使用全部 ${n} 个免费包。`,
+    filesDetected: (n: string, cap: string) => `检测到 ${n} 个文件 — 免费上限：${cap}。`,
+    outputWould: (n: string, cap: string) => `输出将为 ${n} KB — 免费上限：${cap} KB。`,
+    getPro12: "获取 Pro — $12", proUnlock: "获取 Pro — 立即解锁全部功能",
+    oneTime: "一次性付款 · 无订阅 · 永久使用 · 即时激活。",
+    unlockPro: "解锁 CODEXT Pro",
+    freeLabel: "免费", proLabel: "Pro",
+    upToFiles: (n: string) => `最多 ${n} 个文件`, upToKb: (n: string) => `最多 ${n} KB 输出`,
+    bundlesTotal: (n: string) => `共 ${n} 个包`,
+    unlimitedFiles: "无限文件", unlimitedOutput: "无限输出",
+    unlimitedBundles: "无限包", tokenCounting: "Token 计数", autoActivates: "即时激活",
+    youreSet: "一切就绪", fullAccess: "无限包、无限文件、完整 Token 计数。",
+    licenseKeyLabel: "许可证密钥", deviceId: "设备 ID", removeLicense: "从此设备移除许可证",
+    licenseActivated: "许可证已激活！您现在拥有完整的 Pro 访问权限。",
+    licenseRemoved: "许可证已从此设备移除。",
+    cantOpenBrowser: "无法打开浏览器。请访问 codext-web.vercel.app/buy",
+    justNow: "刚刚", mAgo: (n: string) => `${n}分钟前`, hAgo: (n: string) => `${n}小时前`, dAgo: (n: string) => `${n}天前`,
+    rootDir: "/ (根目录)", private: "私有", autoExcluded: "自动排除",
+    download: "下载",
+    repositories: "仓库",
+  },
+  ar: {
+    recentFolders: "المجلدات الأخيرة", clearAll: "مسح الكل",
+    noRecentYet: "لا توجد مجلدات حديثة", browseFolder: "تصفح",
+    connectGitHub: "اربط GitHub لتصفح مستودعاتك",
+    pasteToken: "لصق الرمز:", waitingAuth: "انتظار المصادقة…",
+    loadingRepos: "تحميل المستودعات…", fetchLatest: "تحديث",
+    cloningDots: "جارٍ الاستنساخ…", cloneBundle: "استنساخ وتجميع",
+    pasteTokenHere: "الصق الرمز…   ghp_",
+    dropLabel: "أسقط مجلد مشروعك هنا", dropOr: "أو",
+    browseFolderBtn: "تصفح المجلد",
+    freeNote: (used: string, total: string, files: string) => `مجاني: ${used} من ${total} حزم · حتى ${files} ملف`,
+    fileLimitWarn: (n: string, cap: string) => `⚠ ${n} ملف — الحد المجاني: ${cap}.`,
+    upgradePro: "الترقية إلى Pro ←",
+    optionsTitle: "خيارات",
+    respectGitignore: "احترام .gitignore", respectDesc: "تخطي الملفات المذكورة في .gitignore",
+    skipDefaults: "تخطي الافتراضيات", skipDesc: "استبعاد node_modules و .git و dist و build…",
+    tokenCount: "عد الرموز", tokenDesc: "تقدير استخدام نافذة السياق",
+    maxFileSize: "الحجم الأقصى للملف", skipLarger: "تخطي الملفات الأكبر من هذا الحد",
+    structureOnly: "خريطة الهيكل فقط", chooseFolders: "اختر المجلدات للاستبعاد",
+    pickFolderBtn: "اختر مجلدات", bundleBtn: "تجميع في .txt",
+    bundlingLabel: "جارٍ التجميع…",
+    bundleComplete: "اكتمل التجميع",
+    filesProcessed: "الملفات المعالجة", binarySkipped: "الثنائيات المتخطاة", outputSize: "حجم الناتج",
+    tokenNote: "تقدير نافذة السياق — يتفاوت حسب النموذج",
+    bundleAnother: "تجميع مجلد آخر",
+    clickToOpen: "انقر للفتح", skipVersion: "تخطي هذا الإصدار", updateAvail: "تحديث متاح",
+    noBundlesLeft: "لا حزم متبقية", bundlesLeft: (n: string) => `${n} متبقية`, getPro: "احصل على Pro",
+    proActivated: "تم تفعيل Pro تلقائيًا!",
+    waitingPayment: "انتظار الدفع…", completePurchase: "أكمل شراءك في المتصفح.",
+    autoUnlock: "سيتم الفتح تلقائيًا عند تأكيد الدفع.",
+    checkingEvery: (s: string, n: string) => `فحص كل ${s}ث · ${n} محاولة متبقية`,
+    alreadyHaveKey: "لديك مفتاح بالفعل؟", activate: "تفعيل",
+    cancelActivate: "إلغاء — سأفعّل لاحقًا",
+    timedOut: "انتهت المهلة", noPaymentDetected: "لم يتم اكتشاف دفع. تحقق من بريدك الإلكتروني للحصول على مفتاح الترخيص.",
+    close: "إغلاق", chooseExclude: "اختر المجلدات للاستبعاد",
+    excludeDesc: "قم بإلغاء تحديد المجلدات التي لا تريد تجميعها.",
+    rememberExcl: "تذكر هذه الاستثناءات", rememberDesc: "تطبيق نفس استثناءات المجلدات تلقائيًا في التجميعات المستقبلية",
+    bundleSelected: "تجميع المجلدات المختارة", cancel: "إلغاء",
+    noSubfolders: "لم يتم العثور على مجلدات فرعية.",
+    freeLimitReached: "تم الوصول إلى الحد المجاني",
+    bundlesUsed: (n: string) => `لقد استخدمت جميع الحزم المجانية ${n}.`,
+    filesDetected: (n: string, cap: string) => `تم اكتشاف ${n} ملف — الحد المجاني: ${cap}.`,
+    outputWould: (n: string, cap: string) => `سيكون الناتج ${n} كيلوبايت — الحد المجاني: ${cap} كيلوبايت.`,
+    getPro12: "احصل على Pro — $12", proUnlock: "احصل على Pro — افتح كل شيء فورًا",
+    oneTime: "دفعة واحدة · بدون اشتراك · ملكك للأبد · تفعيل فوري.",
+    unlockPro: "فتح CODEXT Pro",
+    freeLabel: "مجاني", proLabel: "Pro",
+    upToFiles: (n: string) => `حتى ${n} ملف`, upToKb: (n: string) => `حتى ${n} كيلوبايت ناتج`,
+    bundlesTotal: (n: string) => `${n} حزم إجمالاً`,
+    unlimitedFiles: "ملفات غير محدودة", unlimitedOutput: "ناتج غير محدود",
+    unlimitedBundles: "حزم غير محدودة", tokenCounting: "عد الرموز", autoActivates: "تفعيل فوري",
+    youreSet: "أنت جاهز", fullAccess: "حزم وملفات غير محدودة، عد رموز كامل.",
+    licenseKeyLabel: "مفتاح الترخيص", deviceId: "معرف الجهاز", removeLicense: "إزالة الترخيص من هذا الجهاز",
+    licenseActivated: "تم تفعيل الترخيص! لديك الآن وصول Pro كامل.",
+    licenseRemoved: "تمت إزالة الترخيص من هذا الجهاز.",
+    cantOpenBrowser: "تعذر فتح المتصفح. يرجى زيارة codext-web.vercel.app/buy",
+    justNow: "الآن", mAgo: (n: string) => `منذ ${n} دقيقة`, hAgo: (n: string) => `منذ ${n} ساعة`, dAgo: (n: string) => `منذ ${n} يوم`,
+    rootDir: "/ (الجذر)", private: "خاص", autoExcluded: "مستبعد تلقائيًا",
+    download: "تحميل",
+    repositories: "المستودعات",
+  },
+};
+
+const LANG_KEY = "codext_lang";
+function getSavedLang(): Lang {
+  try { return (localStorage.getItem(LANG_KEY) as Lang) || "en"; } catch { return "en"; }
+}
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
   // ── Core state ──
+  const [lang, setLang] = useState<Lang>(getSavedLang);
+  const [langOpen, setLangOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
+  const t = TRANSLATIONS[lang];
+  const switchLang = (l: Lang) => { setLang(l); setLangOpen(false); try { localStorage.setItem(LANG_KEY, l); } catch {} };
   const [state, setState] = useState<AppState>("idle");
   const [folderInfo, setFolderInfo] = useState<FolderInfo | null>(null);
   const [result, setResult] = useState<ProcessResult | null>(null);
@@ -173,10 +566,22 @@ export default function App() {
       if (historyRef.current && !historyRef.current.contains(e.target as Node)) {
         setHistoryOpen(false);
       }
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setLangOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  // Re-fetch folder info when options change so stats always reflect what will be bundled
+  useEffect(() => {
+    if (folderInfo && state === "loaded") {
+      invoke<FolderInfo>("get_folder_info", { folderPath: folderInfo.path, options })
+        .then(info => setFolderInfo(info))
+        .catch(() => {});
+    }
+  }, [options.respect_gitignore, options.skip_default_ignores]);
 
   // ─── License helpers ──────────────────────────────────────────────────────
 
@@ -216,7 +621,7 @@ export default function App() {
       await openUrl(`${SITE_URL}/buy?mid=${encodeURIComponent(machineId)}`);
       setModal("activating"); startPolling(machineId);
     } catch (e) {
-      setLicenseMsg({ type: "err", text: "Could not open browser. Please visit codext-web.vercel.app/buy" });
+      setLicenseMsg({ type: "err", text: t.cantOpenBrowser });
     }
   };
 
@@ -225,7 +630,7 @@ export default function App() {
     try {
       const status = await invoke<LicenseStatus>("activate_license", { key: licenseKey });
       setLicense(status);
-      setLicenseMsg({ type: "ok", text: "License activated! You now have full Pro access." });
+      setLicenseMsg({ type: "ok", text: t.licenseActivated });
       setLicenseKey(""); stopPolling();
       setTimeout(() => setModal(null), 1800);
     } catch (e) { setLicenseMsg({ type: "err", text: String(e) }); }
@@ -234,22 +639,22 @@ export default function App() {
 
   const handleDeactivate = async () => {
     await invoke("deactivate_license"); await refreshLicense();
-    setLicenseMsg({ type: "ok", text: "License removed from this device." });
+    setLicenseMsg({ type: "ok", text: t.licenseRemoved });
   };
 
   // ─── Folder helpers ───────────────────────────────────────────────────────
 
-  const loadFolder = useCallback(async (path: string) => {
+  const loadFolder = useCallback(async (path: string, opts?: ProcessOptions) => {
     setError("");
     try {
-      const info = await invoke<FolderInfo>("get_folder_info", { folderPath: path });
+      const info = await invoke<FolderInfo>("get_folder_info", { folderPath: path, options: opts ?? options });
       setFolderInfo(info);
       setState("loaded");
       // Save to recents
       const updated = pushRecent(path, info.name);
       setRecentFolders(updated);
     } catch (e) { setError(String(e)); setState("error"); }
-  }, []);
+  }, [options]);
 
   const handleBrowse = async () => {
     try {
@@ -505,10 +910,10 @@ export default function App() {
   // Relative time label for recents
   const relativeTime = (ms: number) => {
     const diff = Date.now() - ms;
-    if (diff < 60_000) return "just now";
-    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-    return `${Math.floor(diff / 86_400_000)}d ago`;
+    if (diff < 60_000) return t.justNow;
+    if (diff < 3_600_000) return t.mAgo(String(Math.floor(diff / 60_000)));
+    if (diff < 86_400_000) return t.hAgo(String(Math.floor(diff / 3_600_000)));
+    return t.dAgo(String(Math.floor(diff / 86_400_000)));
   };
 
   // Smart size formatter — input is always KB from backend
@@ -530,7 +935,7 @@ export default function App() {
             <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.3"/>
             <path d="M4.5 7l2 2 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          Pro activated automatically!
+          {t.proActivated}
         </div>
       )}
 
@@ -571,11 +976,11 @@ export default function App() {
             {historyOpen && (
               <div className="history-dropdown history-dropdown--right">
                 <div className="history-dropdown-header">
-                  <span>Recent folders</span>
+                  <span>{t.recentFolders}</span>
                   {recentFolders.length > 0 && (
                     <button className="history-clear-all" onClick={() => {
                       setRecentFolders([]); saveRecents([]); setHistoryOpen(false);
-                    }}>Clear all</button>
+                    }}>{t.clearAll}</button>
                   )}
                 </div>
                 {recentFolders.length === 0 ? (
@@ -584,7 +989,7 @@ export default function App() {
                       <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.3"/>
                       <path d="M10 6v4.5l2.5 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                    No recent folders yet
+                    {t.noRecentYet}
                   </div>
                 ) : (
                   <div className="history-list">
@@ -645,7 +1050,7 @@ export default function App() {
               {updateOpen && (
                 <div className="update-dropdown">
                   <div className="upd-header">
-                    <span className="upd-title">Update available</span>
+                    <span className="upd-title">{t.updateAvail}</span>
                     <span className="upd-new-badge">NEW</span>
                   </div>
                   <div className="upd-body">
@@ -670,16 +1075,34 @@ export default function App() {
                       <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
                         <path d="M7 1v9M7 10l-4-4M7 10l4-4M2 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
-                      Download {updateAvailable.next}
+                      {t.download} {updateAvailable.next}
                     </button>
                     <button className="upd-skip-btn" onClick={() => setUpdateOpen(false)}>
-                      Skip this version
+                      {t.skipVersion}
                     </button>
                   </div>
                 </div>
               )}
             </div>
           )}
+
+          {/* Language switcher */}
+          <div className="lang-wrap" ref={langRef}>
+            <button className={`h-icon-btn lang-btn${langOpen ? " h-icon-btn--active" : ""}`} onClick={() => setLangOpen(o => !o)}>
+              {LANGS.find(l => l.code === lang)?.label}
+            </button>
+            {langOpen && (
+              <div className="lang-dropdown">
+                {LANGS.map(l => (
+                  <button key={l.code} className={`lang-option${lang === l.code ? " lang-option--active" : ""}`} onClick={() => switchLang(l.code)}>
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="h-divider" />
 
           {/* License badge — Pro always, free only when ≤3 left */}
           {isPro ? (
@@ -694,7 +1117,7 @@ export default function App() {
               <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                 <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
-              {bundlesLeft === 0 ? "No bundles left" : `${bundlesLeft} left`} · Get Pro
+              {bundlesLeft === 0 ? t.noBundlesLeft : t.bundlesLeft(String(bundlesLeft))} · {t.getPro}
             </button>
           ) : null}
 
@@ -710,7 +1133,7 @@ export default function App() {
 
           {/* Sidebar header */}
           <div className="sb-header">
-            <span className="sb-title">Repositories</span>
+            <span className="sb-title">{t.repositories}</span>
             {ghState === "connected" && ghUser && (
               <div className="sb-user">
                 <img src={ghUser.avatar_url} className="sb-avatar" alt={ghUser.login}/>
@@ -750,7 +1173,7 @@ export default function App() {
               <>
                 <div className="sb-connecting">
                   <div className="sb-spinner"/>
-                  <span>Waiting for auth…</span>
+                  <span>{t.waitingAuth}</span>
                 </div>
                 <div className="sb-manual-token">
                   <p className="sb-manual-label">Or paste a token directly:</p>
@@ -772,7 +1195,7 @@ export default function App() {
             {ghState === "fetching" && (
               <div className="sb-connecting">
                 <div className="sb-spinner"/>
-                <span>Loading repos…</span>
+                <span>{t.loadingRepos}</span>
               </div>
             )}
             {ghState === "connected" && (
@@ -781,7 +1204,7 @@ export default function App() {
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                     <path d="M10.5 6A4.5 4.5 0 112.3 3.3M1.5 1v3h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  Fetch latest
+                  {t.fetchLatest}
                 </button>
                 <button className="sb-disconnect-btn" onClick={handleDisconnect} title="Disconnect">
                   <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
@@ -801,7 +1224,7 @@ export default function App() {
                 </svg>
                 {ghError
                   ? <p className="sb-gh-error">{ghError}</p>
-                  : <p>Connect GitHub to browse<br/>your repositories here</p>
+                  : <p>{t.connectGitHub}</p>
                 }
               </div>
             )}
@@ -818,7 +1241,7 @@ export default function App() {
                     </svg>
                   </span>
                   <span className="sb-repo-name">{repo.name}</span>
-                  {repo.private && <span className="sb-private-tag">private</span>}
+                  {repo.private && <span className="sb-private-tag">{t.private}</span>}
                 </button>
 
                 {expandedRepo === repo.full_name && repoTrees[repo.full_name] && (
@@ -835,7 +1258,7 @@ export default function App() {
                         </svg>
                       </span>
                       <span className="tree-dir-name" style={{ color: selectedDir === `${repo.full_name}::__root__` ? "var(--accent)" : undefined }}>
-                        / (root)
+                        {t.rootDir}
                       </span>
                     </button>
                     {/* All top-level nodes share one indent line */}
@@ -873,13 +1296,13 @@ export default function App() {
                 disabled={!!cloning}
               >
                 {cloning ? (
-                  <><div className="sb-spinner sb-spinner--sm"/>Cloning…</>
+                  <><div className="sb-spinner sb-spinner--sm"/>{t.cloningDots}</>
                 ) : (
                   <>
                     <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
                       <path d="M7 1v9M7 10l-4-4M7 10l4-4M2 13h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                    Clone &amp; Bundle
+                    {t.cloneBundle}
                   </>
                 )}
               </button>
@@ -901,12 +1324,12 @@ export default function App() {
                   <path d="M16 38h20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.4"/>
                 </svg>
               </div>
-              <p className="drop-label">Drop your project folder here</p>
-              <p className="drop-sub">or</p>
-              <button className="btn-browse" onClick={handleBrowse}>Browse folder</button>
+              <p className="drop-label">{t.dropLabel}</p>
+              <p className="drop-sub">{t.dropOr}</p>
+              <button className="btn-browse" onClick={handleBrowse}>{t.browseFolderBtn}</button>
               {!isPro && license && (
                 <p className="free-note">
-                  Free: {bundlesLeft} of {license.free_bundle_limit} bundles · up to {license.free_file_limit} files
+                  {t.freeNote(String(bundlesLeft), String(license.free_bundle_limit), String(license.free_file_limit))}
                 </p>
               )}
               {state === "error" && error && <p className="error-msg">⚠ {error}</p>}
@@ -928,14 +1351,14 @@ export default function App() {
                 <button className="btn-change" onClick={handleReset}>✕</button>
               </div>
               <div className="stats-row">
-                <Stat label="Files" value={folderInfo.file_count} warn={!isPro && folderInfo.file_count > (license?.free_file_limit ?? 50)}/>
-                <Stat label="Folders" value={folderInfo.folder_count}/>
+                <Stat label={lang === "fr" ? "Fichiers" : lang === "es" ? "Archivos" : lang === "de" ? "Dateien" : lang === "zh" ? "文件" : lang === "ar" ? "ملفات" : "Files"} value={folderInfo.file_count} warn={!isPro && folderInfo.file_count > (license?.free_file_limit ?? 50)}/>
+                <Stat label={lang === "fr" ? "Dossiers" : lang === "es" ? "Carpetas" : lang === "de" ? "Ordner" : lang === "zh" ? "文件夹" : lang === "ar" ? "المجلدات" : "Folders"} value={folderInfo.folder_count}/>
                 <Stat label="Size" value={formatSize(folderInfo.size_kb)}/>
               </div>
               {!isPro && folderInfo.file_count > (license?.free_file_limit ?? 50) && (
                 <div className="limit-warning">
-                  ⚠ {folderInfo.file_count} files — free tier caps at {license?.free_file_limit}.{" "}
-                  <button className="inline-upgrade" onClick={() => setModal("license")}>Upgrade to Pro →</button>
+                  {t.fileLimitWarn(String(folderInfo.file_count), String(license?.free_file_limit))}{" "}
+                  <button className="inline-upgrade" onClick={() => setModal("license")}>{t.upgradePro}</button>
                 </div>
               )}
               <div className="options-panel">
@@ -948,17 +1371,17 @@ export default function App() {
                 </button>
                 {optionsOpen && (
                   <div className="options-grid">
-                    <Toggle label="Respect .gitignore" description="Skip files listed in .gitignore"
+                    <Toggle label={t.respectGitignore} description={t.respectDesc}
                       checked={options.respect_gitignore} onChange={v => setOptions({...options, respect_gitignore: v})}/>
-                    <Toggle label="Skip defaults" description="Exclude node_modules, .git, dist, build…"
+                    <Toggle label={t.skipDefaults} description={t.skipDesc}
                       checked={options.skip_default_ignores} onChange={v => setOptions({...options, skip_default_ignores: v})}/>
-                    <Toggle label="Token count" description="Estimate context window usage"
+                    <Toggle label={t.tokenCount} description={t.tokenDesc}
                       checked={options.include_token_count} onChange={v => setOptions({...options, include_token_count: v})}
                       proOnly={!isPro} onProClick={() => setModal("license")}/>
                     <div className="option-row">
                       <div>
-                        <p className="option-label">Max file size</p>
-                        <p className="option-desc">Skip files larger than this threshold</p>
+                        <p className="option-label">{t.maxFileSize}</p>
+                        <p className="option-desc">{t.skipLarger}</p>
                       </div>
                       <div className="size-input-wrap">
                         <input className="size-input" type="number" min={10} max={10000} value={options.max_file_size_kb}
@@ -979,7 +1402,7 @@ export default function App() {
                     onChange={e => setStructureOnly(e.target.checked)}
                   />
                   <div>
-                    <span className="feat-check-label">Structure map only</span>
+                    <span className="feat-check-label">{t.structureOnly}</span>
                   </div>
                 </label>
                 <label className="feat-check-row">
@@ -990,13 +1413,13 @@ export default function App() {
                     onChange={e => setPickFolders(e.target.checked)}
                   />
                   <div>
-                    <span className="feat-check-label">Choose folders to exclude</span>
+                    <span className="feat-check-label">{t.chooseFolders}</span>
                   </div>
                 </label>
               </div>
 
               <button className="btn-process" onClick={handleProcess}>
-                {pickFolders ? "Pick folders" : "Bundle to .txt"}
+                {pickFolders ? t.pickFolderBtn : t.bundleBtn}
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                   <path d="M9 3l6 6-6 6M3 9h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -1006,7 +1429,7 @@ export default function App() {
 
           {state === "processing" && (
             <div className="processing-view">
-              <div className="processing-label">Bundling your codebase…</div>
+              <div className="processing-label">{t.bundlingLabel}</div>
               <div className="progress-bar-wrap"><div className="progress-bar-fill" style={{width:`${progress}%`}}/></div>
               <p className="progress-pct">{progress}%</p>
             </div>
@@ -1017,8 +1440,8 @@ export default function App() {
             <div className="folder-picker-overlay" onClick={e => { if (e.target === e.currentTarget) setFolderPickerOpen(false); }}>
               <div className="folder-picker-card">
                 <div className="fp-header">
-                  <h2 className="fp-title">Choose folders to exclude</h2>
-                  <p className="fp-sub">Uncheck folders you don't want bundled. Greyed entries are already excluded by your options.</p>
+                  <h2 className="fp-title">{t.chooseExclude}</h2>
+                  <p className="fp-sub">{t.excludeDesc}</p>
                 </div>
                 <div className="fp-list">
                   {(folderPickerFolders as any[]).map((f: any) => (
@@ -1026,6 +1449,7 @@ export default function App() {
                       key={f.path}
                       folder={f}
                       depth={0}
+                      autoExcludedLabel={t.autoExcluded}
                       onToggle={(path: string) => {
                         const toggleInTree = (nodes: any[]): any[] =>
                           nodes.map((x: any) => x.path === path
@@ -1034,32 +1458,60 @@ export default function App() {
                           );
                         setFolderPickerFolders(prev => toggleInTree(prev as any[]) as any);
                       }}
-                      onExpand={async (path: string) => {
+                      onExpand={async (path: string, fullPath: string) => {
                         if (!folderInfo) return;
+
+                        // ── FIX: toggle expanded immediately so the arrow responds at once ──
+                        const toggleExpanded = (nodes: any[]): any[] =>
+                          nodes.map((x: any) =>
+                            x.path === path
+                              ? { ...x, expanded: !x.expanded }
+                              : { ...x, children: x.children ? toggleExpanded(x.children) : x.children }
+                          );
+                        setFolderPickerFolders(prev => toggleExpanded(prev as any[]) as any);
+
+                        // Only fetch children if not already loaded
+                        const findNode = (nodes: any[]): any | null => {
+                          for (const x of nodes) {
+                            if (x.path === path) return x;
+                            if (x.children?.length) {
+                              const found = findNode(x.children);
+                              if (found) return found;
+                            }
+                          }
+                          return null;
+                        };
+                        const current = findNode(folderPickerFolders as any[]);
+                        if (current?.children?.length > 0) return;
+
                         try {
                           const sub = await invoke<{ path: string; name: string; depth: number }[]>(
-                            "list_top_level_dirs", { folderPath: `${folderInfo.path}\\${path}` }
+                            "list_top_level_dirs", { folderPath: fullPath }
                           );
-                          const expandInTree = (nodes: any[]): any[] =>
-                            nodes.map((x: any) => x.path === path
-                              ? { ...x, expanded: !x.expanded, children: x.children?.length
-                                  ? x.children
-                                  : sub.map((s: any) => ({
+                          const loadChildren = (nodes: any[]): any[] =>
+                            nodes.map((x: any) =>
+                              x.path === path
+                                ? {
+                                    ...x,
+                                    children: sub.map((s: any) => ({
                                       ...s,
                                       included: !savedExclusions.includes(s.path),
-                                      expanded: false, children: [],
+                                      expanded: false,
+                                      children: [],
                                       autoExcluded: options.skip_default_ignores && DEFAULT_IGNORED.has(s.name),
-                                    }))
-                                }
-                              : { ...x, children: x.children ? expandInTree(x.children) : x.children }
+                                    })),
+                                  }
+                                : { ...x, children: x.children ? loadChildren(x.children) : x.children }
                             );
-                          setFolderPickerFolders(prev => expandInTree(prev as any[]) as any);
-                        } catch (_) {}
+                          setFolderPickerFolders(prev => loadChildren(prev as any[]) as any);
+                        } catch (e) {
+                          console.error("Failed to load subfolders:", e);
+                        }
                       }}
                     />
                   ))}
                   {(folderPickerFolders as any[]).length === 0 && (
-                    <p className="fp-empty">No subfolders found in this project.</p>
+                    <p className="fp-empty">{t.noSubfolders}</p>
                   )}
                 </div>
 
@@ -1071,19 +1523,19 @@ export default function App() {
                     onChange={e => setRememberExclusions(e.target.checked)}
                   />
                   <div className="fp-remember-text">
-                    <span className="fp-remember-label">Remember these exclusions</span>
-                    <span className="fp-remember-desc">Apply the same folder exclusions automatically on future bundles</span>
+                    <span className="fp-remember-label">{t.rememberExcl}</span>
+                    <span className="fp-remember-desc">{t.rememberDesc}</span>
                   </div>
                 </label>
 
                 <div className="fp-actions">
                   <button className="btn-process" onClick={proceedBundle}>
-                    Bundle selected folders
+                    {t.bundleSelected}
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                       <path d="M9 3l6 6-6 6M3 9h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </button>
-                  <button className="fp-cancel" onClick={() => setFolderPickerOpen(false)}>Cancel</button>
+                  <button className="fp-cancel" onClick={() => setFolderPickerOpen(false)}>{t.cancel}</button>
                 </div>
               </div>
             </div>
@@ -1092,17 +1544,17 @@ export default function App() {
           {state === "done" && result && (
             <div className="done-view">
               <div className="done-icon">✓</div>
-              <h2 className="done-title">Bundle complete</h2>
+              <h2 className="done-title">{t.bundleComplete}</h2>
               <div className="result-grid">
-                <ResultStat label="Files processed" value={result.file_count}/>
-                <ResultStat label="Folders" value={result.folder_count}/>
-                <ResultStat label="Binary skipped" value={result.skipped_binary}/>
-                <ResultStat label="Output size" value={formatSize(result.total_size_kb)}/>
+                <ResultStat label={t.filesProcessed} value={result.file_count}/>
+                <ResultStat label={lang === "fr" ? "Dossiers" : lang === "es" ? "Carpetas" : lang === "de" ? "Ordner" : lang === "zh" ? "文件夹" : lang === "ar" ? "المجلدات" : "Folders"} value={result.folder_count}/>
+                <ResultStat label={t.binarySkipped} value={result.skipped_binary}/>
+                <ResultStat label={t.outputSize} value={formatSize(result.total_size_kb)}/>
                 {result.token_estimate > 0 && <ResultStat label="~Tokens" value={result.token_estimate.toLocaleString()} highlight/>}
               </div>
-              {result.token_estimate > 0 && <p className="token-note">Context window estimate — varies by model</p>}
+              {result.token_estimate > 0 && <p className="token-note">{t.tokenNote}</p>}
               <div className="done-actions">
-                <button className="btn-process" onClick={handleReset}>Bundle another folder</button>
+                <button className="btn-process" onClick={handleReset}>{t.bundleAnother}</button>
               </div>
             </div>
           )}
@@ -1121,7 +1573,7 @@ export default function App() {
             </div>
             <div className="download-info">
               <button className="download-filename" onClick={handleOpen}>{filename}</button>
-              <span className="download-size">{formatSize(result.total_size_kb)} · Click to open</span>
+              <span className="download-size">{formatSize(result.total_size_kb)} · {t.clickToOpen}</span>
             </div>
           </div>
           <div className="download-bar-right">
@@ -1170,10 +1622,10 @@ export default function App() {
                       style={{transformOrigin:"center",animation:"spin 1.2s linear infinite"}}/>
                   </svg>
                 </div>
-                <h2 className="modal-title" style={{textAlign:"center"}}>Waiting for payment…</h2>
+                <h2 className="modal-title" style={{textAlign:"center"}}>{t.waitingPayment}</h2>
                 <p className="modal-sub" style={{textAlign:"center"}}>
-                  Complete your purchase in the browser.<br/>
-                  This will unlock automatically the moment payment is confirmed.
+                  {t.completePurchase}<br/>
+                  {t.autoUnlock}
                 </p>
                 <div className="poll-dots">
                   {Array.from({length: 5}).map((_, i) => (
@@ -1181,39 +1633,39 @@ export default function App() {
                   ))}
                 </div>
                 <p style={{textAlign:"center", fontSize:"10px", color:"var(--text-3)", fontFamily:"var(--font-mono)"}}>
-                  Checking every {POLL_INTERVAL_MS/1000}s · {POLL_MAX_ATTEMPTS - pollAttempts} checks remaining
+                  {t.checkingEvery(String(POLL_INTERVAL_MS/1000), String(POLL_MAX_ATTEMPTS - pollAttempts))}
                 </p>
                 <div className="modal-divider"/>
-                <p className="activate-label" style={{textAlign:"center"}}>Already have a key?</p>
+                <p className="activate-label" style={{textAlign:"center"}}>{t.alreadyHaveKey}</p>
                 <div className="activate-row">
                   <input className="license-input" placeholder="CODEXT-XXXX-XXXX-XXXX-XXXX"
                     value={licenseKey} onChange={e => setLicenseKey(e.target.value.toUpperCase())}
                     onKeyDown={e => e.key === "Enter" && handleActivate()}/>
                   <button className="btn-activate" onClick={handleActivate} disabled={activating || !licenseKey.trim()}>
-                    {activating ? "…" : "Activate"}
+                    {activating ? "…" : t.activate}
                   </button>
                 </div>
                 {licenseMsg && <p className={`license-msg ${licenseMsg.type}`}>{licenseMsg.text}</p>}
                 <button className="btn-cancel-poll" onClick={() => { stopPolling(); setModal(null); }}>
-                  Cancel — I'll activate later
+                  {t.cancelActivate}
                 </button>
               </>
             ) : (
               <>
-                <h2 className="modal-title" style={{textAlign:"center"}}>Timed out</h2>
+                <h2 className="modal-title" style={{textAlign:"center"}}>{t.timedOut}</h2>
                 <p className="modal-sub" style={{textAlign:"center"}}>
-                  Didn't detect a payment. Check your email for your license key and paste it below.
+                  {t.noPaymentDetected}
                 </p>
                 <div className="activate-row" style={{marginTop:"8px"}}>
                   <input className="license-input" placeholder="CODEXT-XXXX-XXXX-XXXX-XXXX"
                     value={licenseKey} onChange={e => setLicenseKey(e.target.value.toUpperCase())}
                     onKeyDown={e => e.key === "Enter" && handleActivate()}/>
                   <button className="btn-activate" onClick={handleActivate} disabled={activating || !licenseKey.trim()}>
-                    {activating ? "…" : "Activate"}
+                    {activating ? "…" : t.activate}
                   </button>
                 </div>
                 {licenseMsg && <p className={`license-msg ${licenseMsg.type}`}>{licenseMsg.text}</p>}
-                <button className="btn-cancel-poll" onClick={() => setModal(null)}>Close</button>
+                <button className="btn-cancel-poll" onClick={() => setModal(null)}>{t.close}</button>
               </>
             )}
           </div>
@@ -1232,51 +1684,51 @@ export default function App() {
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5l1.8 4.3H14L10.3 8.6 11.7 13 7 10.4 2.3 13l1.4-4.4L0 5.8h5.2L7 1.5z" fill="currentColor"/></svg>
                   PRO LICENSE ACTIVE
                 </div>
-                <h2 className="modal-title">You're all set</h2>
-                <p className="modal-sub">Unlimited bundles, unlimited files, full token counting.</p>
+                <h2 className="modal-title">{t.youreSet}</h2>
+                <p className="modal-sub">{t.fullAccess}</p>
                 {license?.key && (
                   <div className="license-key-display">
-                    <span className="license-key-label">License key</span>
+                    <span className="license-key-label">{t.licenseKeyLabel}</span>
                     <span className="license-key-value">{license.key}</span>
                   </div>
                 )}
                 {license?.machine_id && (
                   <div className="license-key-display" style={{marginTop:"8px"}}>
-                    <span className="license-key-label">Device ID</span>
+                    <span className="license-key-label">{t.deviceId}</span>
                     <span className="license-key-value" style={{fontSize:"11px",color:"var(--text-2)"}}>{license.machine_id}</span>
                   </div>
                 )}
-                <button className="btn-deactivate" onClick={handleDeactivate}>Remove license from this device</button>
+                <button className="btn-deactivate" onClick={handleDeactivate}>{t.removeLicense}</button>
                 {licenseMsg && <p className={`license-msg ${licenseMsg.type}`}>{licenseMsg.text}</p>}
               </>
             ) : (
               <>
                 <div className="modal-pricing-header">
-                  <h2 className="modal-title">Unlock CODEXT Pro</h2>
-                  <p className="modal-sub">One-time · No subscription · Yours forever · Auto-activates instantly.</p>
+                  <h2 className="modal-title">{t.unlockPro}</h2>
+                  <p className="modal-sub">{t.oneTime}</p>
                 </div>
                 <div className="pricing-cards">
                   <div className="pricing-card pricing-card--free">
-                    <div className="pricing-tier">Free</div>
+                    <div className="pricing-tier">{t.freeLabel}</div>
                     <div className="pricing-price">$0</div>
                     <ul className="pricing-features">
                       <li className="feat-ok">Up to {license?.free_file_limit} files</li>
                       <li className="feat-ok">Up to {license?.free_output_kb_limit} KB output</li>
                       <li className="feat-ok">{license?.free_bundle_limit} bundles total</li>
-                      <li className="feat-no">Token counting</li>
-                      <li className="feat-no">Unlimited bundles</li>
+                      <li className="feat-no">{t.tokenCounting}</li>
+                      <li className="feat-no">{t.unlimitedBundles}</li>
                     </ul>
                   </div>
                   <div className="pricing-card pricing-card--pro">
                     <div className="pricing-badge-pill">BEST VALUE</div>
-                    <div className="pricing-tier">Pro</div>
+                    <div className="pricing-tier">{t.proLabel}</div>
                     <div className="pricing-price">$12 <span className="pricing-once">one-time</span></div>
                     <ul className="pricing-features">
-                      <li className="feat-ok">Unlimited files</li>
-                      <li className="feat-ok">Unlimited output</li>
-                      <li className="feat-ok">Unlimited bundles</li>
-                      <li className="feat-ok">Token counting</li>
-                      <li className="feat-ok">Auto-activates instantly</li>
+                      <li className="feat-ok">{t.unlimitedFiles}</li>
+                      <li className="feat-ok">{t.unlimitedOutput}</li>
+                      <li className="feat-ok">{t.unlimitedBundles}</li>
+                      <li className="feat-ok">{t.tokenCounting}</li>
+                      <li className="feat-ok">{t.autoActivates}</li>
                     </ul>
                     <button className="btn-buy btn-buy--full" onClick={handleGetPro}>
                       Get Pro — $12
@@ -1285,13 +1737,13 @@ export default function App() {
                   </div>
                 </div>
                 <div className="license-activate-section">
-                  <p className="activate-label">Already have a key?</p>
+                  <p className="activate-label">{t.alreadyHaveKey}</p>
                   <div className="activate-row">
                     <input className="license-input" placeholder="CODEXT-XXXX-XXXX-XXXX-XXXX"
                       value={licenseKey} onChange={e => setLicenseKey(e.target.value.toUpperCase())}
                       onKeyDown={e => e.key === "Enter" && handleActivate()}/>
                     <button className="btn-activate" onClick={handleActivate} disabled={activating || !licenseKey.trim()}>
-                      {activating ? "…" : "Activate"}
+                      {activating ? "…" : t.activate}
                     </button>
                   </div>
                   {licenseMsg && <p className={`license-msg ${licenseMsg.type}`}>{licenseMsg.text}</p>}
@@ -1314,11 +1766,11 @@ export default function App() {
                 <path d="M20 16v8M20 28v2" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"/>
               </svg>
             </div>
-            <h2 className="modal-title">Free limit reached</h2>
+            <h2 className="modal-title">{t.freeLimitReached}</h2>
             <p className="modal-sub limit-detail">
-              {limitError.type === "bundles" && `You've used all ${license?.free_bundle_limit} free bundles.`}
-              {limitError.type === "files" && `${limitError.value} files detected — free tier caps at ${license?.free_file_limit}.`}
-              {limitError.type === "size" && `Output would be ${limitError.value} KB — free tier caps at ${license?.free_output_kb_limit} KB.`}
+              {limitError.type === "bundles" && t.bundlesUsed(String(license?.free_bundle_limit))}
+              {limitError.type === "files" && t.filesDetected(String(limitError.value), String(license?.free_file_limit))}
+              {limitError.type === "size" && t.outputWould(String(limitError.value), String(license?.free_output_kb_limit))}
             </p>
             <div className="limit-upgrade-box">
               <div className="limit-upgrade-price">
@@ -1326,11 +1778,11 @@ export default function App() {
                 <span className="limit-upgrade-term">one-time · no subscription</span>
               </div>
               <button className="btn-buy btn-buy--full" onClick={() => { setModal(null); handleGetPro(); }}>
-                Get Pro — Unlock everything instantly
+                {t.proUnlock}
               </button>
             </div>
             <div className="limit-activate-inline">
-              <p className="activate-label">Have a key already?</p>
+              <p className="activate-label">{t.alreadyHaveKey}</p>
               <div className="activate-row">
                 <input className="license-input" placeholder="CODEXT-XXXX-XXXX-XXXX-XXXX"
                   value={licenseKey} onChange={e => setLicenseKey(e.target.value.toUpperCase())}
@@ -1340,7 +1792,7 @@ export default function App() {
                   const l = await refreshLicense();
                   if (l.is_pro) setModal(null);
                 }} disabled={activating || !licenseKey.trim()}>
-                  {activating ? "…" : "Activate"}
+                  {activating ? "…" : t.activate}
                 </button>
               </div>
               {licenseMsg && <p className={`license-msg ${licenseMsg.type}`}>{licenseMsg.text}</p>}
@@ -1444,10 +1896,11 @@ function TreeNodeRow({ node, repoKey, depth, expandedDirs, selectedDir, onToggle
   );
 }
 
-function FolderPickerRow({ folder, depth, onToggle, onExpand }: {
+function FolderPickerRow({ folder, depth, onToggle, onExpand, autoExcludedLabel }: {
   folder: any; depth: number;
   onToggle: (path: string) => void;
-  onExpand: (path: string) => void;
+  onExpand: (path: string, fullPath: string) => void;
+  autoExcludedLabel: string;
 }) {
   const indent = depth * 18;
 
@@ -1460,7 +1913,7 @@ function FolderPickerRow({ folder, depth, onToggle, onExpand }: {
           <path d="M2 4.5A1.5 1.5 0 013.5 3h3l1.5 1.5H12.5A1.5 1.5 0 0114 6v6a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 12V4.5z" stroke="currentColor" strokeWidth="1.2"/>
         </svg>
         <span className="fp-name">{folder.name}</span>
-        <span className="fp-auto-tag">auto-excluded</span>
+        <span className="fp-auto-tag">{autoExcludedLabel}</span>
       </div>
     );
   }
@@ -1481,7 +1934,7 @@ function FolderPickerRow({ folder, depth, onToggle, onExpand }: {
         />
         <button
           className="fp-expand-btn"
-          onClick={e => { e.stopPropagation(); onExpand(folder.path); }}
+          onClick={e => { e.stopPropagation(); onExpand(folder.path, folder.path); }}
         >
           <svg width="8" height="8" viewBox="0 0 8 8" fill="none"
             style={{ transform: folder.expanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform .15s" }}>
@@ -1495,7 +1948,7 @@ function FolderPickerRow({ folder, depth, onToggle, onExpand }: {
       </div>
       {folder.expanded && folder.children?.map((child: any) => (
         <FolderPickerRow key={child.path} folder={child} depth={depth + 1}
-          onToggle={onToggle} onExpand={onExpand}/>
+          onToggle={onToggle} onExpand={onExpand} autoExcludedLabel={autoExcludedLabel}/>
       ))}
     </div>
   );

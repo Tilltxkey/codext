@@ -1,0 +1,101 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: codext-windows
+            asset_path: src-tauri/target/release/codext.exe
+            asset_name: codext-windows.exe
+          - os: macos-latest
+            artifact_name: codext-macos
+            asset_path: src-tauri/target/release/bundle/dmg
+            asset_name: codext-macos.dmg
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend deps
+        run: npm install
+
+      - name: Build frontend
+        run: npx vite build
+
+      - name: Build Tauri (Windows)
+        if: matrix.os == 'windows-latest'
+        run: npx tauri build --bundles none
+        # --bundles none = skip MSI/NSIS installer, just produce the .exe
+
+      - name: Build Tauri (macOS)
+        if: matrix.os == 'macos-latest'
+        run: npx tauri build --bundles dmg
+
+      - name: Upload Windows exe
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: src-tauri/target/release/codext.exe
+
+      - name: Upload macOS dmg
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure
+        run: ls -R artifacts
+
+      - name: Rename Windows exe
+        run: mv artifacts/codext-windows/codext.exe artifacts/codext-windows.exe
+
+      - name: Rename macOS dmg
+        run: mv artifacts/codext-macos/*.dmg artifacts/codext-macos.dmg
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: CODEXT ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            artifacts/codext-windows.exe
+            artifacts/codext-macos.dmg

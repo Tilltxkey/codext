@@ -257,11 +257,42 @@ pub struct LicenseCheckResult {
 
 fn default_ignored_dirs() -> HashSet<&'static str> {
     let mut s = HashSet::new();
-    for d in ["node_modules",".git","dist","build",".next","target",
-              "__pycache__",".cache","coverage",".nyc_output","vendor",
-              ".venv","venv","env",".env",".idea",".vscode","out",
-              ".turbo",".parcel-cache","storybook-static",".svelte-kit",
-              "elm-stuff",".dart_tool"] { s.insert(d); }
+    for d in [
+        // JS / TS / Node
+        "node_modules", ".cache", ".turbo", ".parcel-cache",
+        ".next", ".nuxt", ".output", ".svelte-kit",
+        "dist", "build", "out", ".expo",
+        "storybook-static", ".angular", ".nx",
+        "__snapshots__",
+        // Rust
+        "target",
+        // Python
+        "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
+        ".venv", "venv", "env", "htmlcov", ".tox",
+        // Ruby
+        ".bundle", "tmp",
+        // Java / Kotlin / Android
+        ".gradle",
+        // iOS / Swift
+        "Pods", ".build",
+        // Elixir / Erlang
+        "_build", "deps",
+        // Dart / Flutter
+        ".dart_tool", ".pub-cache",
+        // Elm
+        "elm-stuff",
+        // Terraform
+        ".terraform",
+        // Coverage / generated
+        "coverage", ".nyc_output",
+        // VCS / editors
+        ".git", ".svn", ".hg",
+        ".vscode", ".idea",
+        // Misc caches
+        ".sass-cache",
+        // Vendored deps
+        "vendor",
+    ] { s.insert(d); }
     s
 }
 
@@ -527,11 +558,25 @@ fn count_id_dirs(node: &IdNode) -> usize {
 
 /// Walk the entire tree from `root` and collect every .gitignore found,
 /// pairing each one with the directory it lives in.
-/// This mirrors how git itself works: each .gitignore applies relative to its
-/// own directory, not just the repo root.
+/// Skips default-ignored directories (node_modules etc.) for performance.
 fn collect_gitignores(root: &Path) -> Vec<(PathBuf, Vec<String>)> {
+    let skip: HashSet<&str> = ["node_modules", ".git", "target", "__pycache__",
+        ".venv", "venv", "vendor", ".gradle", "Pods", "_build", "deps",
+        ".dart_tool", ".pub-cache", ".terraform", ".nx", ".turbo"].iter().cloned().collect();
     let mut result = vec![];
-    for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(root)
+        .into_iter()
+        .filter_entry(|e| {
+            // Prune heavy dirs — don't look for .gitignore inside them
+            if e.file_type().is_dir() {
+                let name = e.file_name().to_string_lossy();
+                !skip.contains(name.as_ref())
+            } else {
+                true
+            }
+        })
+        .filter_map(|e| e.ok())
+    {
         if entry.file_name() != ".gitignore" { continue; }
         let dir = entry.path().parent().unwrap_or(root).to_path_buf();
         let patterns: Vec<String> = fs::read_to_string(entry.path())
@@ -564,38 +609,73 @@ fn is_gitignored(path: &Path, gitignores: &[(PathBuf, Vec<String>)]) -> bool {
             Ok(r) => r,
             Err(_) => return false,
         };
-        // Use forward slashes for matching (works on Windows too)
         let rel_str = rel.to_string_lossy().replace('\\', "/");
         let file_name = path
             .file_name()
             .map(|f| f.to_string_lossy().into_owned())
             .unwrap_or_default();
 
-        patterns.iter().any(|raw| {
-            // Negation patterns are skipped — full negation needs a two-pass approach
-            if raw.starts_with('!') { return false; }
-            let p = raw.trim_start_matches('/').trim_end_matches('/');
+        let mut matched = false;
+        for raw in patterns {
+            let is_negation = raw.starts_with('!');
+            let p = raw.trim_start_matches('!').trim_start_matches('/').trim_end_matches('/');
 
-            if p.contains('*') {
-                // Glob: split on `*` and check prefix + suffix
-                // e.g. `*.env.local` → prefix="" suffix=".env.local"
-                let parts: Vec<&str> = p.splitn(2, '*').collect();
-                let prefix = parts[0];
-                let suffix = if parts.len() > 1 { parts[1] } else { "" };
-                // Match against bare filename (most common) or full relative path
-                (file_name.starts_with(prefix) && file_name.ends_with(suffix))
-                    || (rel_str.starts_with(prefix) && rel_str.ends_with(suffix))
+            let hits = if p.contains('*') || p.contains('?') {
+                // Glob matching: supports *, **, ?
+                glob_match(p, &rel_str) || glob_match(p, &file_name)
             } else if p.contains('/') {
-                // Path pattern: must match from the gitignore's dir
-                // e.g. `build/output` or `src/generated/`
                 rel_str == p || rel_str.starts_with(&format!("{}/", p))
             } else {
-                // Name-only pattern: match exact filename or any path segment.
-                // Avoids the old `.contains()` bug where `env` matched `environment.ts`
                 file_name == p || rel_str.split('/').any(|seg| seg == p)
+            };
+
+            if hits {
+                matched = !is_negation;
             }
-        })
+        }
+        matched
     })
+}
+
+/// Simple glob matcher supporting `*` (any chars, no slash), `**` (any chars including slash), `?` (one char).
+fn glob_match(pattern: &str, text: &str) -> bool {
+    let pat: Vec<char> = pattern.chars().collect();
+    let txt: Vec<char> = text.chars().collect();
+    glob_match_inner(&pat, &txt)
+}
+
+fn glob_match_inner(pat: &[char], txt: &[char]) -> bool {
+    match (pat.first(), txt.first()) {
+        (None, None) => true,
+        (None, _) => false,
+        (Some('*'), _) => {
+            // Check for **
+            if pat.get(1) == Some(&'*') {
+                let rest = &pat[2..];
+                // ** matches zero or more path components
+                for i in 0..=txt.len() {
+                    if glob_match_inner(rest, &txt[i..]) { return true; }
+                }
+                false
+            } else {
+                // * matches anything except '/'
+                let rest = &pat[1..];
+                for i in 0..=txt.len() {
+                    if txt[..i].contains(&'/') { break; }
+                    if glob_match_inner(rest, &txt[i..]) { return true; }
+                }
+                false
+            }
+        }
+        (Some('?'), Some(c)) => {
+            if *c == '/' { return false; }
+            glob_match_inner(&pat[1..], &txt[1..])
+        }
+        (Some(p), Some(t)) => {
+            if p == t { glob_match_inner(&pat[1..], &txt[1..]) } else { false }
+        }
+        _ => false,
+    }
 }
 
 struct TreeNode { name: String, is_dir: bool, children: Vec<TreeNode>, depth: usize }
@@ -692,6 +772,17 @@ fn count_ff(node: &TreeNode) -> (usize, usize) {
     (f,d)
 }
 
+/// Sum the on-disk size of all files in the already-filtered tree.
+fn size_of_tree(node: &TreeNode, base: &Path) -> u64 {
+    fn walk(node: &TreeNode, cur: &Path) -> u64 {
+        if !node.is_dir {
+            return fs::metadata(cur).map(|m| m.len()).unwrap_or(0);
+        }
+        node.children.iter().map(|c| walk(c, &cur.join(&c.name))).sum()
+    }
+    walk(node, base)
+}
+
 fn get_app_output_dir() -> PathBuf {
     let d = get_codext_dir().join("outputs");
     fs::create_dir_all(&d).ok(); d
@@ -786,16 +877,21 @@ pub mod commands {
     pub fn get_license_status() -> LicenseStatus { build_license_status() }
 
     #[tauri::command]
-    pub fn get_folder_info(folder_path: String) -> Result<FolderInfo, String> {
+    pub fn get_folder_info(folder_path: String, options: Option<ProcessOptions>) -> Result<FolderInfo, String> {
         let path = Path::new(&folder_path);
         if !path.exists() || !path.is_dir() { return Err("Invalid folder path".to_string()); }
         let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-        let mut fc=0; let mut dc=0usize; let mut sz:u64=0;
-        for e in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-            if e.file_type().is_file() { fc+=1; sz+=e.metadata().map(|m|m.len()).unwrap_or(0); }
-            else if e.file_type().is_dir() && e.path()!=path { dc+=1; }
-        }
-        Ok(FolderInfo { name, path: folder_path, file_count: fc, folder_count: dc, size_kb: sz as f64/1024.0 })
+
+        // Use the same filtered walk as process_folder so counts match what will actually be bundled
+        let opts = options.unwrap_or_default();
+        let ignored = default_ignored_dirs();
+        let gitignores = if opts.respect_gitignore { collect_gitignores(path) } else { vec![] };
+        let tree = build_tree_with_extra(path, 0, &ignored, &gitignores, path, &opts, &std::collections::HashSet::new());
+        let (fc, dc_with_root) = count_ff(&tree);
+        let dc = dc_with_root.saturating_sub(1); // count_ff counts the root dir itself; exclude it
+        let sz = size_of_tree(&tree, path);
+
+        Ok(FolderInfo { name, path: folder_path, file_count: fc, folder_count: dc, size_kb: sz as f64 / 1024.0 })
     }
 
     /// List immediate subdirectories of a folder — used by the folder picker UI.
@@ -810,8 +906,8 @@ pub mod commands {
             for p in paths {
                 if p.is_dir() {
                     let name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
-                    let rel = p.strip_prefix(path).unwrap_or(&p).to_string_lossy().to_string();
-                    dirs.push(serde_json::json!({ "path": rel, "name": name, "depth": 0 }));
+                    let abs = p.to_string_lossy().to_string();
+                    dirs.push(serde_json::json!({ "path": abs, "name": name, "depth": 0 }));
                 }
             }
         }
@@ -834,7 +930,7 @@ pub mod commands {
         let extra_excl_paths: std::collections::HashSet<PathBuf> = extra_exclusions
             .unwrap_or_default()
             .iter()
-            .map(|rel| root.join(rel))
+            .map(|p| PathBuf::from(p))  // paths are already absolute from list_top_level_dirs
             .collect();
 
         let fname = root.file_name().unwrap_or_default().to_string_lossy().to_string();
