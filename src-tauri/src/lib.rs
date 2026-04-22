@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use tauri::Manager;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
