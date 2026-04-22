@@ -560,6 +560,19 @@ export default function App() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
+  // Listen for GitHub token from deep link (OAuth callback)
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    listen<string>("github-token-received", async (event) => {
+      const token = event.payload;
+      if (token) {
+        setGhToken(token);
+        await fetchGhUser(token);
+      }
+    }).then(fn => { unlisten = fn; });
+    return () => { if (unlisten) unlisten(); };
+  }, []);
+
   // Close history dropdown when clicking outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
