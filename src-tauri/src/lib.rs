@@ -1065,7 +1065,8 @@ pub mod commands {
     /// Clone dir layout: <CODEXT_DIR>/clones/<owner>__<repo>/
     /// Re-cloning the same repo deletes the old clone first to keep disk clean.
     #[tauri::command]
-    pub fn github_clone_repo(clone_url: String, token: String, sub_path: String) -> Result<String, String> {
+    pub async fn github_clone_repo(clone_url: String, token: String, sub_path: String) -> Result<String, String> {
+        tauri::async_runtime::spawn_blocking(move || {
         use std::process::Command;
 
         // Build an authenticated clone URL:
@@ -1093,6 +1094,23 @@ pub mod commands {
         }
 
         // Run: git clone --depth 1 --single-branch <url> <dir>
+        #[cfg(target_os = "windows")]
+        let output = {
+            use std::os::windows::process::CommandExt;
+            Command::new("git")
+                .args([
+                    "clone",
+                    "--depth", "1",
+                    "--single-branch",
+                    &auth_url,
+                    &clone_dir.to_string_lossy(),
+                ])
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                .output()
+                .map_err(|e| format!("git not found — make sure Git is installed: {}", e))?
+        };
+
+        #[cfg(not(target_os = "windows"))]
         let output = Command::new("git")
             .args([
                 "clone",
@@ -1125,6 +1143,9 @@ pub mod commands {
         }
 
         Ok(result_path.to_string_lossy().to_string())
+        })
+        .await
+        .map_err(|e| format!("Thread error: {}", e))?
     }
 } // end pub mod commands
 
@@ -1155,19 +1176,12 @@ use tauri::{Emitter, Listener};
 
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            // Second instance tried to launch — focus the existing window
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // Second instance tried to launch — focus the existing window instead
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
-            }
-            // Forward any deep link URL passed as argument
-            for arg in &args {
-                if arg.starts_with("codext://") {
-                    handle_deep_link(app, arg);
-                    break;
-                }
             }
         }))
         .plugin(tauri_plugin_dialog::init())

@@ -2101,3 +2101,329 @@ html, body, #root {
   line-height: 1.5;
   margin-top: -4px;
 }
+
+/* ════════════════════════════════════════════════════
+   GITHUB TREE — independent styles (not shared with folder picker)
+   ════════════════════════════════════════════════════ */
+
+/* Directory row */
+.gh-tree-dir-wrap {
+  position: relative;
+}
+
+.gh-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px 4px 0;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.gh-tree-row:hover {
+  background: var(--surface-2);
+}
+
+/*.gh-tree-row--selected {
+  background: var(--accent-dim) !important;
+}*/
+
+.gh-tree-row--selected .gh-tree-name {
+  color: var(--accent);
+}
+
+/* Checkbox */
+.gh-tree-checkbox {
+  width: 12px;
+  height: 12px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  background: var(--surface);
+  display: none;
+}
+
+/* Expand/collapse button */
+.gh-tree-expand-btn {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 3px;
+  transition: color 0.1s, background 0.1s;
+  
+}
+
+.gh-tree-expand-btn:hover .gh-tree-folder-icon:hover {
+  color: var(--text-2);
+  
+}
+
+/* Folder icon */
+.gh-tree-folder-icon {
+  flex-shrink: 0;
+  color: var(--text-3);
+  margin-right: 1px;
+  margin-left: -8px;
+  
+}
+
+.gh-tree-row:hover  {
+  color: var(--text-2);
+}
+
+/* Si la ligne est sélectionnée, on change la couleur de l'icône ET du bouton */
+.gh-tree-row--selected .gh-tree-folder-icon,
+.gh-tree-row--selected .gh-tree-expand-btn {
+  color: var(--accent);
+}
+
+
+/* Folder/directory name */
+.gh-tree-name {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  
+}
+
+/* File row */
+.gh-tree-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 8px 3px 0;
+  line-height: 1.5;
+  border-radius: 3px;
+  transition: color 0.08s;
+  margin-left: -12px;
+}
+
+.gh-tree-file:hover {
+  color: var(--text-2);
+}
+
+/* File bullet */
+.gh-tree-bullet {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-3);
+  flex-shrink: 0;
+}
+
+.gh-tree-file:hover .gh-tree-bullet {
+  background: var(--text-2);
+}
+
+/* File name */
+.gh-tree-file-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  
+}
+
+/* Children container */
+.gh-tree-children {
+  margin-left: -12px;
+  border-left: 0px solid var(--border);
+  
+}
+
+/* File icon style */
+.gh-tree-file-icon {
+  flex-shrink: 0;
+  color: var(--text-3);
+  
+}
+
+.gh-tree-file:hover .gh-tree-file-icon {
+  color: var(--text-2);
+}
+
+/* ════════════════════════════════════════════════════
+   GITHUB TREE INDENTATION - independent CSS
+   ════════════════════════════════════════════════════ */
+
+/* Base container for tree nodes */
+.gh-tree-container {
+  position: relative;
+}
+
+/* Directory wrapper */
+.gh-tree-dir-wrap {
+  position: relative;
+}
+
+/* Row container for both folders and files */
+.gh-tree-row,
+.gh-tree-file {
+  position: relative;
+}
+
+/* Indentation levels - you can adjust these values */
+.gh-tree-depth-0 { padding-left: 0px; }
+.gh-tree-depth-1 { padding-left: 10px; }
+.gh-tree-depth-2 { padding-left: 20px; }
+.gh-tree-depth-3 { padding-left: 30px; }
+.gh-tree-depth-4 { padding-left: 40px; }
+.gh-tree-depth-5 { padding-left: 50px; }
+.gh-tree-depth-6 { padding-left: 60px; }
+.gh-tree-depth-7 { padding-left: 80px; }
+.gh-tree-depth-8 { padding-left: 90px; }
+.gh-tree-depth-9 { padding-left: 100px; }
+.gh-tree-depth-10 { padding-left: 110px; }
+
+/* For files - slightly more indentation to align with folder children */
+.gh-tree-file-depth-0 { padding-left: 27px; }
+.gh-tree-file-depth-1 { padding-left: 37px; }
+.gh-tree-file-depth-2 { padding-left: 47px; }
+.gh-tree-file-depth-3 { padding-left: 57px; }
+.gh-tree-file-depth-4 { padding-left: 67px; }
+.gh-tree-file-depth-5 { padding-left: 77px; }
+.gh-tree-file-depth-6 { padding-left: 87px; }
+.gh-tree-file-depth-7 { padding-left: 97px; }
+.gh-tree-file-depth-8 { padding-left: 107px; }
+.gh-tree-file-depth-9 { padding-left: 117px; }
+.gh-tree-file-depth-10 { padding-left: 127px; }
+
+/* Children container with left border line */
+.gh-tree-children {
+  position: relative;
+  
+  margin-left: 0px;
+}
+
+/* ════════════════════════════════════════════════════
+   REPOSITORY (PARENT FOLDER) STYLES - sb-repo-* classes
+   ════════════════════════════════════════════════════ */
+
+/* Main repository container */
+.sb-repo {
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 0;
+}
+
+.sb-repo:last-child {
+  border-bottom: none;
+}
+
+/* Wrapper for the repo row (contains expand button and repo button) */
+.sb-repo-row-wrapper {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+/* Expand/collapse button for repo */
+.sb-repo-expand {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  transition: background 0.12s;
+  flex-shrink: 0;
+}
+
+.sb-repo-expand:hover {
+  background: #ffffff;
+}
+
+/* Arrow icon inside expand button */
+.sb-repo-expand .tree-arrow {
+    background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 3px;
+  transition: color 0.1s, background 0.1s;
+  
+}
+
+.sb-repo-expand:hover .tree-arrow {
+  color: var(--text);
+}
+
+/* Repository row button (clickable area) */
+.sb-repo-row {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 4px;
+  transition: background 0.12s, color 0.12s;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-2);
+  margin: 1px 4px 1px 0;
+  width: calc(100% - 8px);
+}
+
+.sb-repo-row:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* Quand la ligne est survolée, on force la couleur de l'icône à l'intérieur */
+.sb-repo-row:hover .gh-tree-folder-icon {
+  color: var(--text);
+}
+
+/* Selected repository row */
+.sb-repo-row--selected {
+  color: var(--accent) !important;
+}
+
+.sb-repo-row--selected .sb-repo-name {
+  color: var(--accent);
+}
+
+.sb-repo-row--selected .gh-tree-folder-icon {
+  color: var(--accent) !important;
+}
+
+.sb-repo-row--selected .sb-private-tag {
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+/* Repository name */
+.sb-repo-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+

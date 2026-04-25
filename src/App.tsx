@@ -53,7 +53,7 @@ type GhState = "disconnected" | "connecting" | "connected" | "fetching";
 interface RecentFolder {
   path: string;
   name: string;
-  lastUsed: number; // unix ms
+  lastUsed: number;
 }
 
 const RECENT_MAX = 5;
@@ -79,9 +79,7 @@ function pushRecent(path: string, name: string) {
 const SITE_URL = "https://codext-web.vercel.app";
 const POLL_INTERVAL_MS = 4000;
 const POLL_MAX_ATTEMPTS = 20;
-// Free tier threshold — badge only appears when this many bundles or fewer remain
 const BADGE_WARN_THRESHOLD = 3;
-
 
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 
@@ -560,7 +558,7 @@ export default function App() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  // Listen for GitHub token from deep link (OAuth callback)
+  // Listen for GitHub token from deep link
   useEffect(() => {
     let unlisten: (() => void) | null = null;
     listen<string>("github-token-received", async (event) => {
@@ -573,7 +571,7 @@ export default function App() {
     return () => { if (unlisten) unlisten(); };
   }, []);
 
-  // Close history dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (historyRef.current && !historyRef.current.contains(e.target as Node)) {
@@ -587,7 +585,7 @@ export default function App() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Re-fetch folder info when options change so stats always reflect what will be bundled
+  // Re-fetch folder info when options change
   useEffect(() => {
     if (folderInfo && state === "loaded") {
       invoke<FolderInfo>("get_folder_info", { folderPath: folderInfo.path, options })
@@ -663,7 +661,6 @@ export default function App() {
       const info = await invoke<FolderInfo>("get_folder_info", { folderPath: path, options: opts ?? options });
       setFolderInfo(info);
       setState("loaded");
-      // Save to recents
       const updated = pushRecent(path, info.name);
       setRecentFolders(updated);
     } catch (e) { setError(String(e)); setState("error"); }
@@ -911,16 +908,14 @@ export default function App() {
 
   const isPro = license?.is_pro ?? false;
   const bundlesLeft = license ? Math.max(0, license.free_bundle_limit - license.bundle_count) : 0;
-  // Badge is only shown when ≤ BADGE_WARN_THRESHOLD bundles remain (or on process attempt)
   const showFreeBadge = !isPro && license !== null && bundlesLeft <= BADGE_WARN_THRESHOLD;
   const filename = result?.output_path.split(/[\\/]/).pop() ?? "";
   const selRepoKey = selectedDir ? selectedDir.slice(0, selectedDir.indexOf("::")) : null;
   const selPath = selectedDir ? selectedDir.slice(selectedDir.indexOf("::") + 2) : null;
   const selDisplayName = selPath === "__root__"
     ? selRepoKey?.split("/")[1] ?? ""
-    : selPath ?? "";
+    : (selPath?.split("/").pop() ?? "");
 
-  // Relative time label for recents
   const relativeTime = (ms: number) => {
     const diff = Date.now() - ms;
     if (diff < 60_000) return t.justNow;
@@ -929,7 +924,6 @@ export default function App() {
     return t.dAgo(String(Math.floor(diff / 86_400_000)));
   };
 
-  // Smart size formatter — input is always KB from backend
   const formatSize = (kb: number) => {
     if (kb < 1024) return `${kb.toFixed(0)} KB`;
     if (kb < 1024 * 1024) return `${(kb / 1024).toFixed(1)} MB`;
@@ -955,21 +949,17 @@ export default function App() {
       {/* ── Header ── */}
       <header className="header">
 
-        {/* ── Left: logo ── */}
         <div className="header-logo">
           <svg width="272" height="286" viewBox="0 0 272 286" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="47.589" height="285.537" rx="23.7945" transform="matrix(0.500005 -0.866023 0.866028 0.499995 0 91.9984)" fill="#DCFF00"/>
             <rect width="47.589" height="285.537" rx="23.7945" transform="matrix(-0.500005 -0.866023 0.866028 -0.499995 24.4871 235.377)" fill="#DCFF00"/>
             <rect x="113.002" width="47.5896" height="285.534" rx="23.7948" fill="#DCFF00"/>
           </svg>
-
           <span className="logo">CODEXT</span>
         </div>
 
-        {/* ── Spacer ── */}
         <div className="header-spacer" />
 
-        {/* ── Right: icon actions + license badge ── */}
         <div className="header-right">
 
           {/* Recent folders */}
@@ -1045,7 +1035,7 @@ export default function App() {
 
           <div className="h-divider" />
 
-          {/* Update button — only when available */}
+          {/* Update button */}
           {updateAvailable && (
             <div className="h-update-wrap" ref={updateRef}>
               <button
@@ -1116,7 +1106,7 @@ export default function App() {
 
           <div className="h-divider" />
 
-          {/* License badge — Pro always, free only when ≤3 left */}
+          {/* License badge */}
           {isPro ? (
             <button className="badge-pro" onClick={() => { setLicenseMsg(null); setModal("license"); }}>
               <svg width="10" height="10" viewBox="0 0 11 11" fill="none">
@@ -1143,7 +1133,6 @@ export default function App() {
         {/* ════ LEFT SIDEBAR ════ */}
         <aside className="sidebar">
 
-          {/* Sidebar header */}
           <div className="sb-header">
             <span className="sb-title">{t.repositories}</span>
             {ghState === "connected" && ghUser && (
@@ -1154,7 +1143,6 @@ export default function App() {
             )}
           </div>
 
-          {/* Connect / Sync button */}
           <div className="sb-action-wrap">
             {ghState === "disconnected" && (
               <>
@@ -1227,7 +1215,7 @@ export default function App() {
             )}
           </div>
 
-          {/* Repo list */}
+          {/* Repo list - with selectable repo rows (no separate root) */}
           <div className="sb-repo-list">
             {ghState === "disconnected" && (
               <div className="sb-empty">
@@ -1241,61 +1229,70 @@ export default function App() {
               </div>
             )}
 
-            {ghState === "connected" && ghRepos.map(repo => (
-              <div key={repo.id} className="sb-repo">
-                <button
-                  className={`sb-repo-row${expandedRepo === repo.full_name ? " sb-repo-row--open" : ""}`}
-                  onClick={() => handleToggleRepo(repo)}
-                >
-                  <span className="tree-arrow" style={{ transform: expandedRepo === repo.full_name ? "rotate(90deg)" : "rotate(0deg)" }}>
-                    <svg width="6" height="6" viewBox="0 0 6 6" fill="none">
-                      <path d="M1 1l4 2-4 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </span>
-                  <span className="sb-repo-name">{repo.name}</span>
-                  {repo.private && <span className="sb-private-tag">{t.private}</span>}
-                </button>
-
-                {expandedRepo === repo.full_name && repoTrees[repo.full_name] && (
-                  <div className="sb-tree">
-                    {/* Root — selectable, no indent line above it */}
+            {ghState === "connected" && ghRepos.map(repo => {
+              const isRepoSelected = selectedDir === `${repo.full_name}::__root__`;
+              return (
+                <div key={repo.id} className="sb-repo">
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
                     <button
-                      className={`tree-dir tree-dir--root${selectedDir === `${repo.full_name}::__root__` ? " tree-dir--selected" : ""}`}
-                      style={{ paddingLeft: 8 }}
-                      onClick={() => handleSelectRepoRoot(repo)}
+                      className="sb-repo-expand"
+                      onClick={(e) => { e.stopPropagation(); handleToggleRepo(repo); }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0 4px 8px', display: 'flex', alignItems: 'center' }}
                     >
-                      <span className="tree-arrow" style={{ visibility: "hidden" }}>
-                        <svg width="6" height="6" viewBox="0 0 6 6" fill="none">
-                          <path d="M1 1l4 2-4 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <span className="tree-arrow" style={{ transform: expandedRepo === repo.full_name ? "rotate(90deg)" : "rotate(0deg)" }}>
+                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                          <path d="M2 1l4 3-4 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </span>
-                      <span className="tree-dir-name" style={{ color: selectedDir === `${repo.full_name}::__root__` ? "var(--accent)" : undefined }}>
-                        {t.rootDir}
-                      </span>
                     </button>
-                    {/* All top-level nodes share one indent line */}
-                    <div className="tree-children-wrap" style={{ marginLeft: 14 }}>
-                      {repoTrees[repo.full_name].map(node => (
-                        <TreeNodeRow
-                          key={node.path}
-                          node={node}
-                          repoKey={repo.full_name}
-                          depth={0}
-                          expandedDirs={expandedDirs}
-                          selectedDir={selectedDir}
-                          onToggleDir={handleToggleDir}
-                          onSelectDir={handleSelectDir}
-                        />
-                      ))}
-                    </div>
+                    <button
+          className={`sb-repo-row ${isRepoSelected ? "sb-repo-row--selected" : ""}`}
+          onClick={() => handleSelectRepoRoot(repo)}
+          style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          {/* Folder icon for repo */}
+          <svg className="gh-tree-folder-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M2 4.5A1.5 1.5 0 013.5 3h3l1.5 1.5H12.5A1.5 1.5 0 0114 6v6a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 12V4.5z" stroke="currentColor" strokeWidth="1.2"/>
+          </svg>
+          <span className="sb-repo-name">{repo.name}</span>
+          {repo.private && <span className="sb-private-tag">{t.private}</span>}
+        </button>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {expandedRepo === repo.full_name && repoTrees[repo.full_name] && (
+                    <div className="sb-tree">
+                      <div style={{ marginLeft: 20 }}>
+                        {repoTrees[repo.full_name].map(node => (
+                          <GitHubTreeNode
+                            key={node.path}
+                            node={node}
+                            repoKey={repo.full_name}
+                            depth={0}
+                            expandedDirs={expandedDirs}
+                            selectedDir={selectedDir}
+                            onToggleDir={handleToggleDir}
+                            onSelectDir={handleSelectDir}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {selectedDir && (
             <div className="sb-bundle-cta">
+              {/* Progress bar: only rendered while cloning, stalls at 85% so it never finishes early */}
+              {cloning && (
+                <div style={{width:"100%",height:"3px",background:"var(--border,#2a2a2a)",borderRadius:"2px",marginBottom:"10px",overflow:"hidden"}}>
+                  <div
+                    ref={el => { if (el) requestAnimationFrame(() => { el.style.width = "85%"; }) }}
+                    style={{height:"100%",borderRadius:"2px",background:"var(--accent,#c8f135)",width:"0%",transition:"width 28s cubic-bezier(0.4,0.0,0.15,1)"}}
+                  />
+                </div>
+              )}
               <div className="sb-selected-info">
                 <svg width="11" height="11" viewBox="0 0 14 14" fill="none" style={{color:"var(--accent)",flexShrink:0}}>
                   <path d="M2 4a1 1 0 011-1h2.5l1.5 1.5H11a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1V4z" stroke="currentColor" strokeWidth="1.4"/>
@@ -1447,7 +1444,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ── Folder picker — centred modal overlay ── */}
+          {/* ── Folder picker modal ── */}
           {folderPickerOpen && (
             <div className="folder-picker-overlay" onClick={e => { if (e.target === e.currentTarget) setFolderPickerOpen(false); }}>
               <div className="folder-picker-card">
@@ -1472,8 +1469,6 @@ export default function App() {
                       }}
                       onExpand={async (path: string, fullPath: string) => {
                         if (!folderInfo) return;
-
-                        // ── FIX: toggle expanded immediately so the arrow responds at once ──
                         const toggleExpanded = (nodes: any[]): any[] =>
                           nodes.map((x: any) =>
                             x.path === path
@@ -1482,7 +1477,6 @@ export default function App() {
                           );
                         setFolderPickerFolders(prev => toggleExpanded(prev as any[]) as any);
 
-                        // Only fetch children if not already loaded
                         const findNode = (nodes: any[]): any | null => {
                           for (const x of nodes) {
                             if (x.path === path) return x;
@@ -1855,7 +1849,8 @@ function Toggle({ label, description, checked, onChange, proOnly, onProClick }: 
   );
 }
 
-function TreeNodeRow({ node, repoKey, depth, expandedDirs, selectedDir, onToggleDir, onSelectDir }: {
+// GitHub Tree Node component with independent CSS classes and proper indentation
+function GitHubTreeNode({ node, repoKey, depth, expandedDirs, selectedDir, onToggleDir, onSelectDir }: {
   node: TreeNode;
   repoKey: string;
   depth: number;
@@ -1867,40 +1862,71 @@ function TreeNodeRow({ node, repoKey, depth, expandedDirs, selectedDir, onToggle
   const dirKey = `${repoKey}::${node.path}`;
   const isExpanded = expandedDirs.has(dirKey);
   const isSelected = selectedDir === dirKey;
-  // Each depth level = 12px. Indent lines sit at depth*12 + 6 (centred on the arrow).
-  const BASE = 8;
-  const STEP = 12;
-  const rowIndent = BASE + depth * STEP;
+  
+  // Limit depth to 10 (beyond that use the max class)
+  const depthClass = depth <= 10 ? `gh-tree-depth-${depth}` : 'gh-tree-depth-10';
+  const fileDepthClass = depth <= 10 ? `gh-tree-file-depth-${depth}` : 'gh-tree-file-depth-10';
+
+  // Sort children: folders first, then files
+  const sortedChildren = node.children ? [...node.children].sort((a, b) => {
+    if (a.type === "dir" && b.type === "file") return -1;
+    if (a.type === "file" && b.type === "dir") return 1;
+    return a.name.localeCompare(b.name);
+  }) : [];
 
   if (node.type === "file") {
     return (
-      <div className="tree-file" style={{ paddingLeft: rowIndent + 16 }}>
-        <span className="tree-bullet" />
-        <span className="tree-file-name">{node.name}</span>
+      <div className={`gh-tree-file ${fileDepthClass}`}>
+        {/* File icon */}
+        <svg className="gh-tree-file-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <rect x="1.5" y="0.5" width="9" height="11" rx="1.5" stroke="currentColor" strokeWidth="1"/>
+          <path d="M3.5 4h5M3.5 6h3" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round"/>
+        </svg>
+        <span className="gh-tree-file-name">{node.name}</span>
       </div>
     );
   }
 
   return (
-    <div className="tree-dir-wrap">
-      <button
-        className={`tree-dir${isSelected ? " tree-dir--selected" : ""}`}
-        style={{ paddingLeft: rowIndent }}
-        onClick={() => { onToggleDir(repoKey, node); onSelectDir(repoKey, node); }}
+    <div className="gh-tree-dir-wrap">
+      <div
+        className={`gh-tree-row ${depthClass} ${isSelected ? "gh-tree-row--selected" : ""}`}
+        onClick={() => onSelectDir(repoKey, node)}
       >
-        <span className="tree-arrow" style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}>
-          <svg width="6" height="6" viewBox="0 0 6 6" fill="none">
-            <path d="M1 1l4 2-4 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+        <input
+          type="checkbox"
+          className="gh-tree-checkbox"
+          checked={isSelected}
+          readOnly
+        />
+        <button
+          className="gh-tree-expand-btn"
+          onClick={(e) => { e.stopPropagation(); onToggleDir(repoKey, node); }}
+        >
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none"
+            style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform .15s" }}>
+            <path d="M2 1l4 3-4 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-        </span>
-        <span className="tree-dir-name">{node.name}</span>
-      </button>
-      {isExpanded && node.children && (
-        <div className="tree-children-wrap" style={{ marginLeft: rowIndent + 6 }}>
-          {node.children.map(child => (
-            <TreeNodeRow key={child.path} node={child} repoKey={repoKey} depth={depth + 1}
-              expandedDirs={expandedDirs} selectedDir={selectedDir}
-              onToggleDir={onToggleDir} onSelectDir={onSelectDir}/>
+        </button>
+        {/* Folder icon */}
+        <svg className="gh-tree-folder-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2 4.5A1.5 1.5 0 013.5 3h3l1.5 1.5H12.5A1.5 1.5 0 0114 6v6a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 12V4.5z" stroke="currentColor" strokeWidth="1.2"/>
+        </svg>
+        <span className="gh-tree-name">{node.name}</span>
+      </div>
+      {isExpanded && sortedChildren.length > 0 && (
+        <div className="gh-tree-children">
+          {sortedChildren.map(child => (
+            <GitHubTreeNode
+              key={child.path}
+              node={child}
+              repoKey={repoKey}
+              depth={depth + 1}
+              expandedDirs={expandedDirs}
+              selectedDir={selectedDir}
+              onToggleDir={onToggleDir}
+              onSelectDir={onSelectDir}
+            />
           ))}
         </div>
       )}
