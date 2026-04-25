@@ -564,6 +564,8 @@ export default function App() {
     listen<string>("github-token-received", async (event) => {
       const token = event.payload;
       if (token) {
+        // Clear the 60s reconnect timeout
+        clearTimeout((window as any).__codextAuthTimer);
         setGhToken(token);
         await fetchGhUser(token);
       }
@@ -779,7 +781,15 @@ export default function App() {
 
   const handleConnectGitHub = async () => {
     setGhState("connecting");
-    try { await openUrl(`${SITE_URL}/auth/github`); } catch { setGhState("disconnected"); }
+    // Reset back to disconnected after 60s if no token received
+    const authTimer = setTimeout(() => {
+      setGhState(prev => prev === "connecting" ? "disconnected" : prev);
+    }, 60_000);
+    (window as any).__codextAuthTimer = authTimer;
+    try { await openUrl(`${SITE_URL}/auth/github`); } catch {
+      clearTimeout(authTimer);
+      setGhState("disconnected");
+    }
   };
 
   const handleSyncRepos = async () => {
@@ -1994,6 +2004,14 @@ function FolderPickerRow({ folder, depth, onToggle, onExpand, autoExcludedLabel 
 
 // ─── GitHub tree builder ──────────────────────────────────────────────────────
 
+function sortNodes(nodes: TreeNode[]): TreeNode[] {
+  return [...nodes].sort((a, b) => {
+    if (a.type === "dir" && b.type !== "dir") return -1;
+    if (a.type !== "dir" && b.type === "dir") return 1;
+    return a.name.localeCompare(b.name);
+  }).map(n => n.children ? { ...n, children: sortNodes(n.children) } : n);
+}
+
 function buildTree(flatItems: { path: string; type: string }[]): TreeNode[] {
   const root: TreeNode[] = [];
   const map: Record<string, TreeNode> = {};
@@ -2018,5 +2036,5 @@ function buildTree(flatItems: { path: string; type: string }[]): TreeNode[] {
       }
     }
   }
-  return root;
+  return sortNodes(root);
 }

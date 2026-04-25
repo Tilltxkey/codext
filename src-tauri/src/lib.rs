@@ -1176,12 +1176,19 @@ use tauri::{Emitter, Listener};
 
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             // Second instance tried to launch — focus the existing window instead
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
+            }
+            // Forward any deep link URL to the existing window
+            for arg in &args {
+                if arg.starts_with("codext://") {
+                    handle_deep_link(app, arg);
+                    break;
+                }
             }
         }))
         .plugin(tauri_plugin_dialog::init())
